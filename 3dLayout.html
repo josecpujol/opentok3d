@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="js/jquery-2.1.1.min.js"></script>
+  <script src="js/3dLayout.js"></script>
+  <script src="js/webgl-utils.js"></script>
+  <script src="js/J3DI.js"></script>
+  <script type="text/javascript" src="js/glMatrix-0.9.5.min.js"></script>
+  
+  <script id="shader-fs" type="x-shader/x-fragment">
+    precision mediump float;
+    varying vec2 vTextureCoord;
+    uniform sampler2D uSampler;
+    varying vec4 vPosition;
+    uniform float frameNum;    
+    
+    void main(void) {
+    //    vec4 color = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+        gl_FragColor = vec4(0.0,0.0, 1.0, 1.0);
+    }
+</script>
+
+<script id="shader-vs" type="x-shader/x-vertex">
+    attribute vec3 aVertexPosition;
+    attribute vec2 aTextureCoord;
+    
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+
+    varying vec2 vTextureCoord;
+    varying vec4 vPosition;
+
+    void main(void) {
+        gl_PointSize = 3.0;
+        vPosition = uMVMatrix * vec4(aVertexPosition, 1.0);
+        gl_Position = uPMatrix * vPosition;
+        vTextureCoord = aTextureCoord;
+    }
+</script>
+</head>
+<body onload="init();">
+
+<button type="button" id="add_pub">Pub +</button>
+<button type="button" id="rem_pub">Pub -</button>
+<button type="button" id="add_sub">Sub +</button>
+<button type="button" id="rem_sub">Pub -</button>
+<br>
+<canvas id="webgl-canvas" style="border: none;" width="600" height="600"></canvas>
+<script>
+
+var program;
+var g = {};
+
+function initShaders() {
+  program = createProgram("shader-vs", "shader-fs");
+}
+
+function createProgram(vertexShaderId, fragmentShaderId) {
+  var shaderProgram;
+  var fragmentShader = loadShader(gl, fragmentShaderId);
+  var vertexShader = loadShader(gl, vertexShaderId);
+
+  shaderProgram = gl.createProgram();
+  gl.attachShader(shaderProgram, vertexShader);
+  gl.attachShader(shaderProgram, fragmentShader);
+  gl.linkProgram(shaderProgram);
+
+  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+    alert("Could not initialise shaders");
+  }
+
+  gl.useProgram(shaderProgram);
+
+  shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+  gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+ // shaderProgram.textureCoordAttribute = gl.getAttribLocation(shaderProgram, "aTextureCoord");
+ // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+
+  shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+  shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+  shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "uSampler");
+  shaderProgram.frameNumUniform = gl.getUniformLocation(shaderProgram, "frameNum");
+  return shaderProgram;
+}
+
+function degToRad(degrees) {
+  return degrees * Math.PI / 180;
+}
+
+    var frame_num = 0.0;
+    var xRot = 0.0;
+        var mvMatrix = mat4.create();
+    var mvMatrixStack = [];
+    var pMatrix = mat4.create();
+
+    function drawScene() {
+        xRot += 0.1; 
+
+        gl.viewport(0, 0, 600, 600);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        mat4.perspective(45, 1.0, 0.1, 100.0, pMatrix);
+      
+        mat4.identity(mvMatrix);
+
+        mat4.translate(mvMatrix, [0.0, 0.0, -5.0]);
+        mat4.rotate(mvMatrix, degToRad(xRot), [1, 0, 0]);
+        mat4.rotate(mvMatrix, degToRad(0.0), [0, 1, 0]);
+
+        
+        gl.useProgram(program);
+        gl.uniform1i(program.samplerUniform, 0);
+        gl.uniform1f(program.frameNumUniform, frame_num);
+        mat4.rotate(mvMatrix, degToRad(90.0), [1, 0, 0]);
+        gl.uniformMatrix4fv(program.pMatrixUniform, false, pMatrix);
+        gl.uniformMatrix4fv(program.mvMatrixUniform, false, mvMatrix);
+       
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, g.geometry.vertexObject);
+        gl.vertexAttribPointer(program.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+        
+    
+       // gl.bindBuffer(gl.ARRAY_BUFFER, g.geometry.texCoordObject);
+       // gl.vertexAttribPointer(program.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
+        
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.geometry.indexObject);
+
+        
+        gl.drawElements(gl.LINE_LOOP, g.geometry.numIndices, gl.UNSIGNED_BYTE, 0);
+      //  gl.drawArrays(gl.POINTS, 0, 24);
+    }
+
+var gl;
+function init() {
+  var canvas = document.getElementById("webgl-canvas");
+  gl = WebGLUtils.setupWebGL(canvas);
+  if (!gl) {
+    return;
+  }
+  initShaders();
+
+ // g.geometry = makeBox(gl);
+   g.geometry = makePlane(gl);
+ // g.geometry = makeSphere(gl, 1.0, 10, 10);
+
+  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.enable(gl.DEPTH_TEST);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  var f = function () {
+    drawScene();
+    requestId = window.requestAnimFrame(f, canvas);
+  };
+  f();
+}
+
+$( "#add_pub" ).click(function() {
+  addPublisher();
+});
+$( "#rem_pub" ).click(function() {
+  removePublisher();
+});
+$( "#add_sub" ).click(function() {
+  addSubscriber();
+});
+$( "#rem_sub" ).click(function() {
+  removeSubscriber();
+});
+</script>
+</body>
+</html>
