@@ -2,11 +2,44 @@
 <html>
 <head>
   <script src="js/jquery-2.1.1.min.js"></script>
-  <script src="js/3dLayout.js"></script>
   <script src="js/webgl-utils.js"></script>
   <script src="js/J3DI.js"></script>
-  <script type="text/javascript" src="js/glMatrix-0.9.5.min.js"></script>
-  
+  <script src="js/myLibrary.js"></script>
+ 
+ <!-- Shaders for axis --> 
+  <script id="shader-fs-axis" type="x-shader/x-fragment">
+    precision mediump float;
+    varying vec2 vTextureCoord;
+    uniform sampler2D uSampler;
+    uniform float frameNum;   
+    varying vec4 vPosition;
+    varying vec4 vColor;    
+    
+    void main(void) {
+       gl_FragColor = vColor;
+    }
+</script>
+
+<script id="shader-vs-axis" type="x-shader/x-vertex">
+    attribute vec3 aVertexPosition;
+    attribute vec3 aVertexColor;
+    
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+   
+    varying vec4 vColor;
+    varying vec4 vPosition;
+
+    void main(void) {
+        gl_PointSize = 3.0;
+        vPosition = uMVMatrix * vec4(aVertexPosition, 1.0);
+        gl_Position = uPMatrix * vPosition;
+        vColor = vec4(aVertexColor, 1.0);
+    }
+</script>
+ 
+ 
+ 
   <script id="shader-fs" type="x-shader/x-fragment">
     precision mediump float;
     varying vec2 vTextureCoord;
@@ -48,11 +81,15 @@
 <canvas id="webgl-canvas" style="border: none;" width="600" height="600"></canvas>
 <script>
 
-var program;
 var g = {};
 
 function initShaders() {
-  program = createProgram("shader-vs", "shader-fs");
+  g.program = createProgram("shader-vs", "shader-fs");
+  g.programAxis = createProgram("shader-vs-axis", "shader-fs-axis");
+  
+  // This is specific for programAxis
+  g.programAxis.colorAttribute = gl.getAttribLocation(g.programAxis, "aVertexColor");
+  gl.enableVertexAttribArray(g.programAxis.colorAttribute);
 }
 
 function createProgram(vertexShaderId, fragmentShaderId) {
@@ -88,48 +125,80 @@ function degToRad(degrees) {
   return degrees * Math.PI / 180;
 }
 
-    var frame_num = 0.0;
-    var xRot = 0.0;
-        var mvMatrix = mat4.create();
-    var mvMatrixStack = [];
-    var pMatrix = mat4.create();
+function setMatrixUniforms(ctx, program) {
+  ctx.uniformMatrix4fv(program.pMatrixUniform, false, pMatrix);
+  ctx.uniformMatrix4fv(program.mvMatrixUniform, false, mvMatrix);
+}
 
-    function drawScene() {
-        xRot += 0.1; 
+var frame_num = 0;
+var xRot = 0.0;
 
-        gl.viewport(0, 0, 600, 600);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+function updateWorld() {
+  frame_num++;
+  xRot += 0.01;
+  var r = 3.0;
+  g.camera.setPosition(r * Math.sin(xRot), r * Math.cos(xRot), 0.4);
+ // g.camera.setPosition(-1, 0, 0.1);
+}
 
-        mat4.perspective(45, 1.0, 0.1, 100.0, pMatrix);
-      
-        mat4.identity(mvMatrix);
+function drawScene() {
+ 
 
-        mat4.translate(mvMatrix, [0.0, 0.0, -5.0]);
-        mat4.rotate(mvMatrix, degToRad(xRot), [1, 0, 0]);
-        mat4.rotate(mvMatrix, degToRad(0.0), [0, 1, 0]);
+  gl.viewport(0, 0, 600, 600);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        
-        gl.useProgram(program);
-        gl.uniform1i(program.samplerUniform, 0);
-        gl.uniform1f(program.frameNumUniform, frame_num);
-        mat4.rotate(mvMatrix, degToRad(90.0), [1, 0, 0]);
-        gl.uniformMatrix4fv(program.pMatrixUniform, false, pMatrix);
-        gl.uniformMatrix4fv(program.mvMatrixUniform, false, mvMatrix);
-       
+  mat4.perspective(45, 1.0, 0.1, 100.0, pMatrix);
+  
+  mvMatrix = g.camera.getExtrinsicMatrix();
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, g.geometry.vertexObject);
-        gl.vertexAttribPointer(program.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-        
-    
-       // gl.bindBuffer(gl.ARRAY_BUFFER, g.geometry.texCoordObject);
-       // gl.vertexAttribPointer(program.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
-        
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.geometry.indexObject);
+  // Draw axis
+  gl.useProgram(g.programAxis);
+  setMatrixUniforms(gl, g.programAxis);
+  gl.bindBuffer(gl.ARRAY_BUFFER, g.axis.vertexObject);
+  gl.vertexAttribPointer(g.programAxis.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, g.axis.colorObject);
+  gl.vertexAttribPointer(g.programAxis.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.LINES, 0, 6);
 
-        
-        gl.drawElements(gl.LINE_LOOP, g.geometry.numIndices, gl.UNSIGNED_BYTE, 0);
-      //  gl.drawArrays(gl.POINTS, 0, 24);
-    }
+  // Draw the rest
+  gl.useProgram(g.program);
+  gl.uniform1i(g.program.samplerUniform, 0);
+  gl.uniform1f(g.program.frameNumUniform, frame_num);
+  for (var i = 0; i < geometryArray.length; i++) {
+    mvPushMatrix();
+    myObject = geometryArray[i];
+    mat4.multiply(mvMatrix, myObject.matrix);
+    setMatrixUniforms(gl, g.program);
+    gl.bindBuffer(gl.ARRAY_BUFFER, myObject.geometry.vertexObject);
+    gl.vertexAttribPointer(g.program.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+    // gl.bindBuffer(gl.ARRAY_BUFFER, g.geometry.texCoordObject);
+    // gl.vertexAttribPointer(program.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, myObject.geometry.indexObject);
+
+    gl.drawElements(gl.LINE_LOOP, myObject.geometry.numIndices, gl.UNSIGNED_BYTE, 0);
+    mvPopMatrix();
+  }
+
+/*  gl.useProgram(g.program);
+  gl.uniform1i(g.program.samplerUniform, 0);
+  gl.uniform1f(g.program.frameNumUniform, frame_num);
+
+  setMatrixUniforms(gl, g.program);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, g.geometry.vertexObject);
+  gl.vertexAttribPointer(g.program.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+  // gl.bindBuffer(gl.ARRAY_BUFFER, g.geometry.texCoordObject);
+  // gl.vertexAttribPointer(program.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
+
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.geometry.indexObject);
+
+  gl.drawElements(gl.LINE_LOOP, g.geometry.numIndices, gl.UNSIGNED_BYTE, 0);
+  //  gl.drawArrays(gl.POINTS, 0, 24);
+  */
+}
 
 var gl;
 function init() {
@@ -140,31 +209,46 @@ function init() {
   }
   initShaders();
 
- // g.geometry = makeBox(gl);
-   g.geometry = makePlane(gl);
- // g.geometry = makeSphere(gl, 1.0, 10, 10);
-
+  // g.geometry = makeBox(gl);
+  g.geometryPlane = makePlane(gl);
+  g.axis = makeAxis(gl);
+  
+  camera = new Camera();
+  camera.setLookAt(5, 5, 5,
+    0, 0, 0,
+    0, 0, 1);
+  g.camera = camera;
+  // g.geometry = makeSphere(gl, 1.0, 10, 10);
+/*
+  var myObject = {};
+  myObject.type = "FLOOR";
+  myObject.matrix = mat4.create();
+  mat4.identity(myObject.matrix);
+  myObject.geometry = g.geometryPlane;
+  geometryArray.push(myObject);
+*/
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
   gl.enable(gl.DEPTH_TEST);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   var f = function () {
+    updateWorld();
     drawScene();
     requestId = window.requestAnimFrame(f, canvas);
   };
   f();
 }
 
-$( "#add_pub" ).click(function() {
+$("#add_pub").click(function () {
   addPublisher();
 });
-$( "#rem_pub" ).click(function() {
+$("#rem_pub").click(function () {
   removePublisher();
 });
-$( "#add_sub" ).click(function() {
+$("#add_sub").click(function () {
   addSubscriber();
 });
-$( "#rem_sub" ).click(function() {
+$("#rem_sub").click(function () {
   removeSubscriber();
 });
 </script>
