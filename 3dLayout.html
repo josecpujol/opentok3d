@@ -49,7 +49,7 @@
     
     void main(void) {
     //    vec4 color = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
-        gl_FragColor = vec4(0.0,0.0, 1.0, 1.0);
+        gl_FragColor = vec4(1.0,1.0, 1.0, 1.0);
     }
 </script>
 
@@ -135,20 +135,27 @@ var xRot = 0.0;
 
 function updateWorld() {
   frame_num++;
-  xRot += 0.01;
+  //xRot += 0.01;
+  xRot = -Math.PI / 2;
   var r = 3.0;
   g.camera.setPosition(r * Math.sin(xRot), r * Math.cos(xRot), 0.4);
  // g.camera.setPosition(-1, 0, 0.1);
 }
 
 function drawScene() {
- 
 
-  gl.viewport(0, 0, 600, 600);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  mat4.perspective(45, 1.0, 0.1, 100.0, pMatrix);
-  
+  var fovy = 45;
+  var fovy_rad = fovy * Math.PI / 180;
+  if (canvas.width > canvas.height) {
+    mat4.perspective(fovy, canvas.width / canvas.height, 0.1, 100.0, pMatrix);
+  } else {
+    var new_fovy_rad = 2 * Math.atan (canvas.height/canvas.width * Math.tan(fovy_rad / 2));
+    var new_fovy = new_fovy_rad * 180 / Math.PI;
+    mat4.perspective(new_fovy, canvas.width / canvas.height, 0.1, 100.0, pMatrix);
+  }
+ // mat4.frustum(-canvas.width/2, canvas.width/2, -canvas.heigth / 2, canvas.height / 2, 0.1, 100.0, pMatrix);
   mvMatrix = g.camera.getExtrinsicMatrix();
 
   // Draw axis
@@ -200,9 +207,25 @@ function drawScene() {
   */
 }
 
+function onWindowResize(event) {
+
+
+  canvas.width = window.innerWidth * 0.9;
+  canvas.height = window.innerHeight * 0.9;
+/*
+  parameters.screenWidth = canvas.width;
+  parameters.screenHeight = canvas.height;
+*/
+  gl.viewport(0, 0, canvas.width, canvas.height);
+
+  console.log("Onresize");
+}
+
 var gl;
+var canvas;
 function init() {
-  var canvas = document.getElementById("webgl-canvas");
+  canvas = document.getElementById("webgl-canvas");	
+
   gl = WebGLUtils.setupWebGL(canvas);
   if (!gl) {
     return;
@@ -230,6 +253,8 @@ function init() {
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
   gl.enable(gl.DEPTH_TEST);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  onWindowResize();
+  window.addEventListener( 'resize', onWindowResize, false );
 
   var f = function () {
     updateWorld();
