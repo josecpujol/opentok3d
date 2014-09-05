@@ -7,7 +7,7 @@
   <script src="js/myLibrary.js"></script>
  
  <!-- Shaders for axis --> 
-  <script id="shader-fs-axis" type="x-shader/x-fragment">
+  <script id="shader-fs-color" type="x-shader/x-fragment">
     precision mediump float;
     varying vec2 vTextureCoord;
     uniform sampler2D uSampler;
@@ -20,7 +20,7 @@
     }
 </script>
 
-<script id="shader-vs-axis" type="x-shader/x-vertex">
+<script id="shader-vs-color" type="x-shader/x-vertex">
     attribute vec3 aVertexPosition;
     attribute vec3 aVertexColor;
     
@@ -85,11 +85,11 @@ var g = {};
 
 function initShaders() {
   g.program = createProgram("shader-vs", "shader-fs");
-  g.programAxis = createProgram("shader-vs-axis", "shader-fs-axis");
+  g.programColor = createProgram("shader-vs-color", "shader-fs-color");
   
   // This is specific for programAxis
-  g.programAxis.colorAttribute = gl.getAttribLocation(g.programAxis, "aVertexColor");
-  gl.enableVertexAttribArray(g.programAxis.colorAttribute);
+  g.programColor.colorAttribute = gl.getAttribLocation(g.programColor, "aVertexColor");
+  gl.enableVertexAttribArray(g.programColor.colorAttribute);
 }
 
 function createProgram(vertexShaderId, fragmentShaderId) {
@@ -137,8 +137,8 @@ function updateWorld() {
   frame_num++;
   //xRot += 0.01;
   xRot = -Math.PI / 2;
-  var r = 3.0;
-  g.camera.setPosition(r * Math.sin(xRot), r * Math.cos(xRot), 0.4);
+  var r = 2.5;
+  g.camera.setPosition(r * Math.sin(xRot), r * Math.cos(xRot), 0.5);
  // g.camera.setPosition(-1, 0, 0.1);
 }
 
@@ -159,23 +159,31 @@ function drawScene() {
   mvMatrix = g.camera.getExtrinsicMatrix();
 
   // Draw axis
-  gl.useProgram(g.programAxis);
-  setMatrixUniforms(gl, g.programAxis);
+  gl.useProgram(g.programColor);
+  setMatrixUniforms(gl, g.programColor);
   gl.bindBuffer(gl.ARRAY_BUFFER, g.axis.vertexObject);
-  gl.vertexAttribPointer(g.programAxis.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribPointer(g.programColor.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
   gl.bindBuffer(gl.ARRAY_BUFFER, g.axis.colorObject);
-  gl.vertexAttribPointer(g.programAxis.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribPointer(g.programColor.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.LINES, 0, 6);
-
-  // Draw the rest
-  gl.useProgram(g.program);
-  gl.uniform1i(g.program.samplerUniform, 0);
-  gl.uniform1f(g.program.frameNumUniform, frame_num);
+  
   for (var i = 0; i < geometryArray.length; i++) {
+    var currentProgram;
     mvPushMatrix();
     myObject = geometryArray[i];
+    if (myObject.program === "COLOR") {
+      currentProgram = g.programColor;
+      gl.bindBuffer(gl.ARRAY_BUFFER, myObject.geometry.colorObject);
+      gl.vertexAttribPointer(currentProgram.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
+    } else {
+      currentProgram = g.program;     
+    }
+    gl.useProgram(currentProgram);
+    gl.uniform1i(currentProgram.samplerUniform, 0);
+    gl.uniform1f(currentProgram.frameNumUniform, frame_num);
+      
     mat4.multiply(mvMatrix, myObject.matrix);
-    setMatrixUniforms(gl, g.program);
+    setMatrixUniforms(gl, currentProgram);
     gl.bindBuffer(gl.ARRAY_BUFFER, myObject.geometry.vertexObject);
     gl.vertexAttribPointer(g.program.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
 
@@ -183,8 +191,7 @@ function drawScene() {
     // gl.vertexAttribPointer(program.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, myObject.geometry.indexObject);
-
-    gl.drawElements(gl.LINE_LOOP, myObject.geometry.numIndices, gl.UNSIGNED_BYTE, 0);
+    gl.drawElements(myObject.mode, myObject.geometry.numIndices, gl.UNSIGNED_BYTE, 0);
     mvPopMatrix();
   }
 
@@ -212,10 +219,6 @@ function onWindowResize(event) {
 
   canvas.width = window.innerWidth * 0.9;
   canvas.height = window.innerHeight * 0.9;
-/*
-  parameters.screenWidth = canvas.width;
-  parameters.screenHeight = canvas.height;
-*/
   gl.viewport(0, 0, canvas.width, canvas.height);
 
   console.log("Onresize");
@@ -238,18 +241,22 @@ function init() {
   
   camera = new Camera();
   camera.setLookAt(5, 5, 5,
-    0, 0, 0,
+    0, 0, 0.3,
     0, 0, 1);
   g.camera = camera;
   // g.geometry = makeSphere(gl, 1.0, 10, 10);
-/*
+
   var myObject = {};
+  myObject.program = "COLOR";
+  myObject.mode = gl.TRIANGLES;
   myObject.type = "FLOOR";
   myObject.matrix = mat4.create();
   mat4.identity(myObject.matrix);
-  myObject.geometry = g.geometryPlane;
+  mat4.rotate(myObject.matrix, Math.PI / 2, [0, 0, 1]);
+  mat4.scale(myObject.matrix, [3, 3, 1]);
+  myObject.geometry = makeFloor(gl);
   geometryArray.push(myObject);
-*/
+
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
   gl.enable(gl.DEPTH_TEST);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);

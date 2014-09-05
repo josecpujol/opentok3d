@@ -34,13 +34,17 @@ function rebuildPersons() {
   for (var i = 0; i < numPersons; i++) {
     var myObject = {};
     myObject.type = pubsubs;
+    myObject.program = "REGULAR";
+    myObject.mode = gl.LINE_LOOP;
     myObject.matrix = mat4.create();
     mat4.identity(myObject.matrix);
     mat4.rotate(myObject.matrix, (totalArc / numPersons) / 2 - totalArc / 2, [0, 0, 1]);
     mat4.rotate(myObject.matrix, i * totalArc / numPersons, [0, 0, 1]);
     mat4.translate(myObject.matrix, [radius, 0.0, 0.0]); // Same for all
-    mat4.rotate(myObject.matrix, Math.PI / 2, [0, 1, 0]); // Original geometry is xy plane. Make it yz plane
+  //  mat4.translate(myObject.matrix, [0, 0, (length / width) / 2]);  // Make it be at xy = 0
+    mat4.rotate(myObject.matrix, -Math.PI / 2, [0, 1, 0]); // Original geometry is xy plane. Make it yz plane
     mat4.scale(myObject.matrix, [(length / width) / videoAspectRatio, length / width, 1.0]); // Adapt width to fit arc
+    mat4.translate(myObject.matrix, [width / 2, 0, 0]);  // make it 
     myObject.geometry = g.geometryPlane;
     geometryArray.push(myObject);
   }
@@ -101,6 +105,20 @@ function makePlane(ctx) {
   retval.numIndices = indices.length;
 
   return retval;
+}
+
+function makeFloor(ctx) {
+  var object = makePlane(ctx);
+  var colors = new Float32Array(
+      [0, 0, 1, 0, 0, 1,
+        0, 1, 1, 0, 1, 1]);
+        
+  object.colorObject = ctx.createBuffer();
+  ctx.bindBuffer(ctx.ARRAY_BUFFER, object.colorObject);
+  ctx.bufferData(ctx.ARRAY_BUFFER, colors, ctx.STATIC_DRAW);
+
+  ctx.bindBuffer(ctx.ARRAY_BUFFER, null);
+  return object;
 }
 
 function makeAxis(ctx) {
