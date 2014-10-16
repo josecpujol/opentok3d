@@ -1,5 +1,5 @@
 geometryArray = [];
-var numPersons = 0;
+var numParticipants = 0;
 var width = 2.0;  // The one in makePlane
 var videoAspectRatio = 4.0/3.0;
 var radius = 1.0;
@@ -10,17 +10,17 @@ function addPublisher() {}
 function removePublisher() {}
 
 function addSubscriber() {
-  numPersons++;
-  rebuildPersons();
+  numParticipants++;
+  rebuildParticipants();
  }
 
 function removeSubscriber() {
-  numPersons--;
-  if (numPersons < 0) numPersons = 0;
-  rebuildPersons();
+  numParticipants--;
+  if (numParticipants < 0) numParticipants = 0;
+  rebuildParticipants();
 }
 
-function rebuildPersons() {
+function rebuildParticipants() {
 
   // remove all pub and subs and leave the rest of geometry
   var pubsubs = "PUBSUBS";
@@ -30,16 +30,16 @@ function rebuildPersons() {
       geometryArray.splice(i, 1);
   }
 
-  var length = radius * Math.sqrt(2 - 2 * Math.cos(totalArc / numPersons));
-  for (var i = 0; i < numPersons; i++) {
+  var length = radius * Math.sqrt(2 - 2 * Math.cos(totalArc / numParticipants));
+  for (var i = 0; i < numParticipants; i++) {
     var myObject = {};
     myObject.type = pubsubs;
-    myObject.program = "REGULAR";
+    myObject.program = "TEXTURE";
     myObject.mode = gl.LINE_LOOP;
     myObject.matrix = mat4.create();
     mat4.identity(myObject.matrix);
-    mat4.rotate(myObject.matrix, (totalArc / numPersons) / 2 - totalArc / 2, [0, 0, 1]);
-    mat4.rotate(myObject.matrix, i * totalArc / numPersons, [0, 0, 1]);
+    mat4.rotate(myObject.matrix, (totalArc / numParticipants) / 2 - totalArc / 2, [0, 0, 1]);
+    mat4.rotate(myObject.matrix, i * totalArc / numParticipants, [0, 0, 1]);
     mat4.translate(myObject.matrix, [radius, 0.0, 0.0]); // Same for all
   //  mat4.translate(myObject.matrix, [0, 0, (length / width) / 2]);  // Make it be at xy = 0
     mat4.rotate(myObject.matrix, -Math.PI / 2, [0, 1, 0]); // Original geometry is xy plane. Make it yz plane
@@ -110,8 +110,8 @@ function makePlane(ctx) {
 function makeFloor(ctx) {
   var object = makePlane(ctx);
   var colors = new Float32Array(
-      [0, 0, 1, 0, 0, 1,
-        0, 1, 1, 0, 1, 1]);
+      [0.05, 0.30, 0.43, 0.05, 0.30, 0.43,
+        0.35, 0.69, 0.83,0.35, 0.69, 0.83]);
         
   object.colorObject = ctx.createBuffer();
   ctx.bindBuffer(ctx.ARRAY_BUFFER, object.colorObject);
