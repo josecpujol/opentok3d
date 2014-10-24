@@ -1,5 +1,6 @@
 
 var webpage; // To be preloaded in the initialization
+var threejs;  // same
 var apiKey;
 function getChatPage(sessionId, token) {
   // Do some substitutions here
@@ -36,13 +37,10 @@ var init = function (init_done) {
   
   // Preload html page to serve it from memory
   var fs = require('fs');
-  fs.readFile('./chat.html', function (err, html) {
-    if (err) {
-      throw err;
-    }
-    webpage = html;
-    init_done();
-  });
+  webpage = fs.readFileSync('./chat.html');
+  threejs = fs.readFileSync('./js/three.min.js');
+  init_done();
+ 
 }
 
 var init_done = function () {
@@ -56,6 +54,11 @@ function run() {
       if (url == "/" || url == "/favicon.ico") {
         response.writeHead(200);
         response.end();
+        return;
+      }
+      if (url == "/js/three.min.js") {
+        response.writeHead(200, {"Content-Type" : "application/javascript"});
+        response.end(threejs);
         return;
       }
 
