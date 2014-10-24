@@ -35,7 +35,7 @@ function rebuildParticipants() {
     var myObject = {};
     myObject.type = pubsubs;
     myObject.program = "TEXTURE";
-    myObject.mode = gl.LINE_LOOP;
+    myObject.mode = gl.TRIANGLES;
     myObject.matrix = mat4.create();
     mat4.identity(myObject.matrix);
     mat4.rotate(myObject.matrix, (totalArc / numParticipants) / 2 - totalArc / 2, [0, 0, 1]);
@@ -48,7 +48,7 @@ function rebuildParticipants() {
     myObject.geometry = g.geometryPlane;
     geometryArray.push(myObject);
   }
-  console.log("Length %d", geometryArray.length);
+ // console.log("Length %d", geometryArray.length);
 }
 // webgl helpers
 var mvMatrix = mat4.create();

@@ -23,6 +23,7 @@
 <script id="shader-vs-color" type="x-shader/x-vertex">
     attribute vec3 aVertexPosition;
     attribute vec3 aVertexColor;
+    attribute vec2 aTextureCoord;
     
     uniform mat4 uMVMatrix;
     uniform mat4 uPMatrix;
@@ -34,13 +35,11 @@
         gl_PointSize = 3.0;
         vPosition = uMVMatrix * vec4(aVertexPosition, 1.0);
         gl_Position = uPMatrix * vPosition;
-        vColor = vec4(aVertexColor, 1.0);
+        vColor = vec4(aVertexColor, 0.95);
     }
 </script>
- 
- 
- 
-  <script id="shader-fs" type="x-shader/x-fragment">
+
+<script id="shader-fs-texture" type="x-shader/x-fragment">
     precision mediump float;
     varying vec2 vTextureCoord;
     uniform sampler2D uSampler;
@@ -48,8 +47,20 @@
     uniform float frameNum;    
     
     void main(void) {
-    //    vec4 color = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
-        gl_FragColor = vec4(1.0,1.0, 1.0, 1.0);
+      gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+     // gl_FragColor = vec4(1.0,0.0, 0.0, 1.0);
+    }
+</script> 
+ 
+<script id="shader-fs" type="x-shader/x-fragment">
+    precision mediump float;
+    varying vec2 vTextureCoord;
+    uniform sampler2D uSampler;
+    varying vec4 vPosition;
+    uniform float frameNum;    
+    
+    void main(void) {
+        gl_FragColor = vec4(0.0,0.0, 1.0, 1.0);
     }
 </script>
 
@@ -77,6 +88,7 @@
 <button type="button" id="rem_pub">Pub -</button>
 <button type="button" id="add_sub">Sub +</button>
 <button type="button" id="rem_sub">Pub -</button>
+<button type="button" id="pause_world">Pause</button>
 <br>
 <canvas id="webgl-canvas" style="border: none;" width="600" height="600"></canvas>
 <script>
@@ -84,12 +96,31 @@
 var g = {};
 
 function initShaders() {
-  g.program = createProgram("shader-vs", "shader-fs");
+  // g.program = createProgram("shader-vs", "shader-fs");
+  g.programTexture = createProgram("shader-vs", "shader-fs-texture");
   g.programColor = createProgram("shader-vs-color", "shader-fs-color");
-  
+
   // This is specific for programAxis
-  g.programColor.colorAttribute = gl.getAttribLocation(g.programColor, "aVertexColor");
-  gl.enableVertexAttribArray(g.programColor.colorAttribute);
+  var colorAttribute = gl.getAttribLocation(g.programColor, "aVertexColor");
+  gl.enableVertexAttribArray(colorAttribute);
+}
+
+function initTextures() {
+  g.texture = gl.createTexture();
+  var cubeImage = new Image();
+  cubeImage.onload = function () {
+    handleTextureLoaded(cubeImage, g.texture);
+  }
+  cubeImage.src = "texture.png";
+}
+
+function handleTextureLoaded(image, texture) {
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
 function createProgram(vertexShaderId, fragmentShaderId) {
@@ -111,8 +142,10 @@ function createProgram(vertexShaderId, fragmentShaderId) {
   shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
   gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
 
- // shaderProgram.textureCoordAttribute = gl.getAttribLocation(shaderProgram, "aTextureCoord");
- // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+  // This line may show a WebGL: INVALID_VALUE: enableVertexAttribArray: index out of range error
+  // It really is a optimization message, because we don´t use it in the COLOR shader
+  shaderProgram.textureCoordAttribute = gl.getAttribLocation(shaderProgram, "aTextureCoord");
+  gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
 
   shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
   shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
@@ -132,14 +165,58 @@ function setMatrixUniforms(ctx, program) {
 
 var frame_num = 0;
 var xRot = 0.0;
+var run = true;
 
 function updateWorld() {
+  if (!run) {
+    return;
+  }
   frame_num++;
-  //xRot += 0.01;
-  xRot = -Math.PI / 2;
+  xRot += 0.01;
+  // xRot = -Math.PI / 2;
   var r = 2.5;
   g.camera.setPosition(r * Math.sin(xRot), r * Math.cos(xRot), 0.5);
- // g.camera.setPosition(-1, 0, 0.1);
+  // g.camera.setPosition(-1, 0, 0.1);
+}
+
+function drawObject(myObject) {
+  var currentProgram;
+  var geometry = myObject.geometry;
+  //console.log("Type: " + myObject.type);
+  gl.disable(gl.BLEND);
+  if (myObject.program === "COLOR") {
+    currentProgram = g.programColor;
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.BLEND);
+    gl.bindBuffer(gl.ARRAY_BUFFER, geometry.colorObject);
+    gl.vertexAttribPointer(currentProgram.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
+    //  console.log("using color shader");
+  } else if (myObject.program === "TEXTURE") {
+    currentProgram = g.programTexture;
+    //  console.log("using texture shader");
+  } else {
+    currentProgram = g.program;
+    //  console.log("using default shader");
+  }
+  gl.useProgram(currentProgram);
+  gl.uniform1f(currentProgram.frameNumUniform, frame_num);
+
+  mat4.multiply(mvMatrix, myObject.matrix);
+  setMatrixUniforms(gl, currentProgram);
+  gl.bindBuffer(gl.ARRAY_BUFFER, geometry.vertexObject);
+  gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+  if (myObject.program === "TEXTURE") {
+    gl.bindBuffer(gl.ARRAY_BUFFER, geometry.texCoordObject);
+    gl.vertexAttribPointer(currentProgram.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, g.texture);
+    gl.uniform1i(currentProgram.samplerUniform, 0);
+  }
+
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometry.indexObject);
+  gl.drawElements(myObject.mode, geometry.numIndices, gl.UNSIGNED_BYTE, 0);
 }
 
 function drawScene() {
@@ -151,11 +228,11 @@ function drawScene() {
   if (canvas.width > canvas.height) {
     mat4.perspective(fovy, canvas.width / canvas.height, 0.1, 100.0, pMatrix);
   } else {
-    var new_fovy_rad = 2 * Math.atan (canvas.height/canvas.width * Math.tan(fovy_rad / 2));
+    var new_fovy_rad = 2 * Math.atan(canvas.height / canvas.width * Math.tan(fovy_rad / 2));
     var new_fovy = new_fovy_rad * 180 / Math.PI;
     mat4.perspective(new_fovy, canvas.width / canvas.height, 0.1, 100.0, pMatrix);
   }
- // mat4.frustum(-canvas.width/2, canvas.width/2, -canvas.heigth / 2, canvas.height / 2, 0.1, 100.0, pMatrix);
+  // mat4.frustum(-canvas.width/2, canvas.width/2, -canvas.heigth / 2, canvas.height / 2, 0.1, 100.0, pMatrix);
   mvMatrix = g.camera.getExtrinsicMatrix();
 
   // Draw axis
@@ -166,79 +243,47 @@ function drawScene() {
   gl.bindBuffer(gl.ARRAY_BUFFER, g.axis.colorObject);
   gl.vertexAttribPointer(g.programColor.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.LINES, 0, 6);
-  
+
+  // Everything but the floor is to be reflected
   for (var i = 0; i < geometryArray.length; i++) {
-    var currentProgram;
+    if (geometryArray[i].type === "FLOOR")
+      continue;
     mvPushMatrix();
-    myObject = geometryArray[i];
-    if (myObject.program === "COLOR") {
-      currentProgram = g.programColor;
-      gl.bindBuffer(gl.ARRAY_BUFFER, myObject.geometry.colorObject);
-      gl.vertexAttribPointer(currentProgram.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
-    } else {
-      currentProgram = g.program;     
-    }
-    gl.useProgram(currentProgram);
-    gl.uniform1i(currentProgram.samplerUniform, 0);
-    gl.uniform1f(currentProgram.frameNumUniform, frame_num);
-      
-    mat4.multiply(mvMatrix, myObject.matrix);
-    setMatrixUniforms(gl, currentProgram);
-    gl.bindBuffer(gl.ARRAY_BUFFER, myObject.geometry.vertexObject);
-    gl.vertexAttribPointer(g.program.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-
-    // gl.bindBuffer(gl.ARRAY_BUFFER, g.geometry.texCoordObject);
-    // gl.vertexAttribPointer(program.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, myObject.geometry.indexObject);
-    gl.drawElements(myObject.mode, myObject.geometry.numIndices, gl.UNSIGNED_BYTE, 0);
+    mat4.scale(mvMatrix, [1, 1, -1]);
+    drawObject(geometryArray[i]);
     mvPopMatrix();
   }
 
-/*  gl.useProgram(g.program);
-  gl.uniform1i(g.program.samplerUniform, 0);
-  gl.uniform1f(g.program.frameNumUniform, frame_num);
-
-  setMatrixUniforms(gl, g.program);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, g.geometry.vertexObject);
-  gl.vertexAttribPointer(g.program.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-
-  // gl.bindBuffer(gl.ARRAY_BUFFER, g.geometry.texCoordObject);
-  // gl.vertexAttribPointer(program.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
-
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.geometry.indexObject);
-
-  gl.drawElements(gl.LINE_LOOP, g.geometry.numIndices, gl.UNSIGNED_BYTE, 0);
-  //  gl.drawArrays(gl.POINTS, 0, 24);
-  */
+  for (var i = 0; i < geometryArray.length; i++) {
+    mvPushMatrix();
+    drawObject(geometryArray[i]);
+    mvPopMatrix();
+  }
 }
 
 function onWindowResize(event) {
-
-
   canvas.width = window.innerWidth * 0.9;
   canvas.height = window.innerHeight * 0.9;
   gl.viewport(0, 0, canvas.width, canvas.height);
-
   console.log("Onresize");
 }
 
 var gl;
 var canvas;
 function init() {
-  canvas = document.getElementById("webgl-canvas");	
+  canvas = document.getElementById("webgl-canvas");
 
   gl = WebGLUtils.setupWebGL(canvas);
   if (!gl) {
     return;
   }
   initShaders();
+  initTextures();
 
   // g.geometry = makeBox(gl);
   g.geometryPlane = makePlane(gl);
   g.axis = makeAxis(gl);
-  
+
   camera = new Camera();
   camera.setLookAt(5, 5, 5,
     0, 0, 0.3,
@@ -253,23 +298,26 @@ function init() {
   myObject.matrix = mat4.create();
   mat4.identity(myObject.matrix);
   mat4.rotate(myObject.matrix, Math.PI / 2, [0, 0, 1]);
-  mat4.scale(myObject.matrix, [3, 3, 1]);
+  mat4.scale(myObject.matrix, [10, 2, 1]);
   myObject.geometry = makeFloor(gl);
   geometryArray.push(myObject);
 
-  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clearColor(0.19, 0.62, 0.8, 1.0);
+  //gl.clearColor(0.0, 0.0, 0.0, 1.0);
+
   gl.enable(gl.DEPTH_TEST);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   onWindowResize();
-  window.addEventListener( 'resize', onWindowResize, false );
+  window.addEventListener('resize', onWindowResize, false);
 
-  var f = function () {
-    updateWorld();
-    drawScene();
-    requestId = window.requestAnimFrame(f, canvas);
-  };
   f();
 }
+
+var f = function () {
+  updateWorld();
+  drawScene();
+  requestId = window.requestAnimFrame(f, canvas);
+};
 
 $("#add_pub").click(function () {
   addPublisher();
@@ -279,10 +327,15 @@ $("#rem_pub").click(function () {
 });
 $("#add_sub").click(function () {
   addSubscriber();
+  //  f();
 });
 $("#rem_sub").click(function () {
   removeSubscriber();
 });
+$("#pause_world").click(function () {
+  run = !run;
+});
+
 </script>
 </body>
 </html>
