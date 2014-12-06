@@ -5,16 +5,16 @@
   <script src="js/webgl-utils.js"></script>
   <script src="js/J3DI.js"></script>
   <script src="js/myLibrary.js"></script>
- 
- <!-- Shaders for axis --> 
+
+ <!-- Shaders for axis -->
   <script id="shader-fs-color" type="x-shader/x-fragment">
     precision mediump float;
     varying vec2 vTextureCoord;
     uniform sampler2D uSampler;
-    uniform float frameNum;   
+    uniform float frameNum;
     varying vec4 vPosition;
-    varying vec4 vColor;    
-    
+    varying vec4 vColor;
+
     void main(void) {
        gl_FragColor = vColor;
     }
@@ -24,10 +24,10 @@
     attribute vec3 aVertexPosition;
     attribute vec3 aVertexColor;
     attribute vec2 aTextureCoord;
-    
+
     uniform mat4 uMVMatrix;
     uniform mat4 uPMatrix;
-   
+
     varying vec4 vColor;
     varying vec4 vPosition;
 
@@ -44,21 +44,21 @@
     varying vec2 vTextureCoord;
     uniform sampler2D uSampler;
     varying vec4 vPosition;
-    uniform float frameNum;    
-    
+    uniform float frameNum;
+
     void main(void) {
       gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
      // gl_FragColor = vec4(1.0,0.0, 0.0, 1.0);
     }
-</script> 
- 
+</script>
+
 <script id="shader-fs" type="x-shader/x-fragment">
     precision mediump float;
     varying vec2 vTextureCoord;
     uniform sampler2D uSampler;
     varying vec4 vPosition;
-    uniform float frameNum;    
-    
+    uniform float frameNum;
+
     void main(void) {
         gl_FragColor = vec4(0.0,0.0, 1.0, 1.0);
     }
@@ -67,7 +67,7 @@
 <script id="shader-vs" type="x-shader/x-vertex">
     attribute vec3 aVertexPosition;
     attribute vec2 aTextureCoord;
-    
+
     uniform mat4 uMVMatrix;
     uniform mat4 uPMatrix;
 
@@ -101,8 +101,9 @@ function initShaders() {
   g.programColor = createProgram("shader-vs-color", "shader-fs-color");
 
   // This is specific for programAxis
-  var colorAttribute = gl.getAttribLocation(g.programColor, "aVertexColor");
-  gl.enableVertexAttribArray(colorAttribute);
+
+  g.programColor.vertexColorAttribute = gl.getAttribLocation(g.programColor, "aVertexColor");
+  gl.enableVertexAttribArray(g.programColor.vertexColorAttribute);
 }
 
 function initTextures() {
