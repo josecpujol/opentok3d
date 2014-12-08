@@ -84,24 +84,20 @@
 </head>
 <body onload="init();">
 
-<button type="button" id="add_pub">Pub +</button>
-<button type="button" id="rem_pub">Pub -</button>
-<button type="button" id="add_sub">Sub +</button>
-<button type="button" id="rem_sub">Pub -</button>
-<button type="button" id="pause_world">Pause</button>
-<br>
-<canvas id="webgl-canvas" style="border: none;" width="600" height="600"></canvas>
+    <div id="controls">
+        <input type="button" id="add_client" value="Add client" />
+        <input type="button" id="pause_world" value="Pause" />
+    </div>
+    <canvas id="webgl-canvas" style="border: none;" width="600" height="600"></canvas>
 <script>
 
 var g = {};
 
 function initShaders() {
-  // g.program = createProgram("shader-vs", "shader-fs");
   g.programTexture = createProgram("shader-vs", "shader-fs-texture");
   g.programColor = createProgram("shader-vs-color", "shader-fs-color");
 
   // This is specific for programAxis
-
   g.programColor.vertexColorAttribute = gl.getAttribLocation(g.programColor, "aVertexColor");
   gl.enableVertexAttribArray(g.programColor.vertexColorAttribute);
 }
@@ -175,50 +171,11 @@ function updateWorld() {
   frame_num++;
   xRot += 0.01;
   // xRot = -Math.PI / 2;
-  var r = 2.5;
+  var r = 2;
   g.camera.setPosition(r * Math.sin(xRot), r * Math.cos(xRot), 0.5);
   // g.camera.setPosition(-1, 0, 0.1);
 }
 
-function drawObject(myObject) {
-  var currentProgram;
-  var geometry = myObject.geometry;
-  //console.log("Type: " + myObject.type);
-  gl.disable(gl.BLEND);
-  if (myObject.program === "COLOR") {
-    currentProgram = g.programColor;
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.enable(gl.BLEND);
-    gl.bindBuffer(gl.ARRAY_BUFFER, geometry.colorObject);
-    gl.vertexAttribPointer(currentProgram.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
-    //  console.log("using color shader");
-  } else if (myObject.program === "TEXTURE") {
-    currentProgram = g.programTexture;
-    //  console.log("using texture shader");
-  } else {
-    currentProgram = g.program;
-    //  console.log("using default shader");
-  }
-  gl.useProgram(currentProgram);
-  gl.uniform1f(currentProgram.frameNumUniform, frame_num);
-
-  mat4.multiply(mvMatrix, myObject.matrix);
-  setMatrixUniforms(gl, currentProgram);
-  gl.bindBuffer(gl.ARRAY_BUFFER, geometry.vertexObject);
-  gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-
-  if (myObject.program === "TEXTURE") {
-    gl.bindBuffer(gl.ARRAY_BUFFER, geometry.texCoordObject);
-    gl.vertexAttribPointer(currentProgram.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
-
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, g.texture);
-    gl.uniform1i(currentProgram.samplerUniform, 0);
-  }
-
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometry.indexObject);
-  gl.drawElements(myObject.mode, geometry.numIndices, gl.UNSIGNED_BYTE, 0);
-}
 
 function drawScene() {
 
@@ -251,13 +208,13 @@ function drawScene() {
       continue;
     mvPushMatrix();
     mat4.scale(mvMatrix, [1, 1, -1]);
-    drawObject(geometryArray[i]);
+    geometryArray[i].draw(gl);
     mvPopMatrix();
   }
 
   for (var i = 0; i < geometryArray.length; i++) {
     mvPushMatrix();
-    drawObject(geometryArray[i]);
+    geometryArray[i].draw(gl);
     mvPopMatrix();
   }
 }
@@ -289,22 +246,44 @@ function init() {
   camera.setLookAt(5, 5, 5,
     0, 0, 0.3,
     0, 0, 1);
+ /* camera.setLookAt(0, 0, 10,
+    0, 0, 0,
+    1, 0, 0);*/
   g.camera = camera;
   // g.geometry = makeSphere(gl, 1.0, 10, 10);
 
   var myObject = {};
-  myObject.program = "COLOR";
-  myObject.mode = gl.TRIANGLES;
+
   myObject.type = "FLOOR";
   myObject.matrix = mat4.create();
   mat4.identity(myObject.matrix);
   mat4.rotate(myObject.matrix, Math.PI / 2, [0, 0, 1]);
   mat4.scale(myObject.matrix, [10, 2, 1]);
   myObject.geometry = makeFloor(gl);
+  myObject.draw = function(gl) {
+      var currentProgram = g.programColor;
+      gl.useProgram(currentProgram);
+      var geometry = this.geometry;
+      gl.disable(gl.BLEND);
+
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.enable(gl.BLEND);
+      gl.bindBuffer(gl.ARRAY_BUFFER, geometry.colorObject);
+      gl.vertexAttribPointer(currentProgram.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
+
+      gl.uniform1f(currentProgram.frameNumUniform, frame_num);
+
+      mat4.multiply(mvMatrix, this.matrix);
+      setMatrixUniforms(gl, currentProgram);
+      gl.bindBuffer(gl.ARRAY_BUFFER, geometry.vertexObject);
+      gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometry.indexObject);
+      gl.drawElements(gl.TRIANGLES, geometry.numIndices, gl.UNSIGNED_BYTE, 0);
+  }
   geometryArray.push(myObject);
 
   gl.clearColor(0.19, 0.62, 0.8, 1.0);
-  //gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
   gl.enable(gl.DEPTH_TEST);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -320,22 +299,31 @@ var f = function () {
   requestId = window.requestAnimFrame(f, canvas);
 };
 
-$("#add_pub").click(function () {
-  addPublisher();
-});
-$("#rem_pub").click(function () {
-  removePublisher();
-});
-$("#add_sub").click(function () {
-  addSubscriber();
-  //  f();
-});
-$("#rem_sub").click(function () {
-  removeSubscriber();
-});
-$("#pause_world").click(function () {
-  run = !run;
-});
+    var nextId = 0;
+
+    $("#add_client").click(function () {
+        addClient(nextId);
+
+
+        // Debug: add button to remove client
+        var myId = nextId;
+        var myButton =$('<input type="button" value="Remove ' + myId + '"/>');
+        myButton.click(function() {
+            console.log("Remmoving client " + myId);
+            removeClient(myId);
+            $(this).remove();
+
+        });
+        $('#controls').append(myButton);
+
+
+
+        nextId++;
+    });
+
+    $("#pause_world").click(function () {
+        run = !run;
+    });
 
 </script>
 </body>
