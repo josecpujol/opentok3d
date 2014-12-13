@@ -172,8 +172,11 @@ function updateWorld() {
   xRot += 0.01;
   // xRot = -Math.PI / 2;
   var r = 2;
-  g.camera.setPosition(r * Math.sin(xRot), r * Math.cos(xRot), 0.5);
+//  g.camera.setPosition(r * Math.sin(xRot), r * Math.cos(xRot), 0.5);
   // g.camera.setPosition(-1, 0, 0.1);
+  var center, lookAt, up;
+  var ext = getCameraExtrinsics();
+  g.camera.setLookAtV(ext.eye, ext.center, ext.up);
 }
 
 
@@ -181,7 +184,7 @@ function drawScene() {
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  var fovy = 45;
+  var fovy = 90;
   var fovy_rad = fovy * Math.PI / 180;
   if (canvas.width > canvas.height) {
     mat4.perspective(fovy, canvas.width / canvas.height, 0.1, 100.0, pMatrix);
@@ -246,9 +249,9 @@ function init() {
   camera.setLookAt(5, 5, 5,
     0, 0, 0.3,
     0, 0, 1);
- /* camera.setLookAt(0, 0, 10,
+  camera.setLookAt(0, 0, 10,
     0, 0, 0,
-    1, 0, 0);*/
+    1, 0, 0);
   g.camera = camera;
   // g.geometry = makeSphere(gl, 1.0, 10, 10);
 

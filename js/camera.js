@@ -22,6 +22,10 @@ Camera.prototype.setLookAt = function(eyex, eyey, eyez, centerx, centery, center
   this.invalidateMatrix = true;
 }
 
+Camera.prototype.setLookAtV = function(eye, center, up ) {
+ this.setLookAt(eye[0], eye[1], eye[2], center[0], center[1], center[2], up[0], up[1], up[2])
+}
+
 Camera.prototype.moveTo = function(eyex, eyey, eyez, centerx, centery, centerz, upx, upy, upz) {
 }
 

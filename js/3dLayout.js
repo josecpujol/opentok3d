@@ -1,24 +1,70 @@
 geometryArray = [];
-var numParticipants = 0;
+
 var width = 2.0;  // The one in makePlane
 var videoAspectRatio = 4.0/3.0;
 var radius = 1.0;
 var totalArc = Math.PI ;
 var numParticipantsX = 4;  // We will be stacking up
+var clientType = "CLIENT";
 
 
 function addClient(id) {
-  numParticipants++;
-  rebuildParticipants();
- }
+
+
+  var myObject = {};
+  myObject.type = clientType;
+  // myObject.matrix = this will be filled in rearrangelayout
+  myObject.geometry = g.geometryPlane;
+  myObject.id = id;
+  myObject.draw = function(gl) {
+    var currentProgram;
+    var geometry = this.geometry;
+    currentProgram = g.programTexture;
+    gl.useProgram(currentProgram);
+    gl.uniform1f(currentProgram.frameNumUniform, frame_num);
+
+    mat4.multiply(mvMatrix, this.matrix);
+    setMatrixUniforms(gl, currentProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, geometry.vertexObject);
+    gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, geometry.texCoordObject);
+    gl.vertexAttribPointer(currentProgram.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, g.texture);
+    gl.uniform1i(currentProgram.samplerUniform, 0);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometry.indexObject);
+    gl.drawElements(gl.TRIANGLES, geometry.numIndices, gl.UNSIGNED_BYTE, 0);
+  };
+  geometryArray.push(myObject);
+
+  rearrangeLayout();
+}
 
 function removeClient(id) {
-  numParticipants--;
-  if (numParticipants < 0) {
-    numParticipants = 0;
+
+  // Remove guy with that id
+  for (var i = geometryArray.length - 1; i >= 0; i--) {
+    if (geometryArray[i].id == id)
+      geometryArray.splice(i, 1);
   }
-  rebuildParticipants();
+
+  rearrangeLayout();
 }
+
+function rearrangeLayout() {
+
+  var posClient = 0;
+  // rearrange layout
+  for (var i = 0; i < geometryArray.length; i++) {
+    if (geometryArray[i].type === clientType) {
+      geometryArray[i].matrix = matrixForLayout(posClient % numParticipantsX, Math.floor(posClient / numParticipantsX));
+      posClient++;
+    }
+  }
+}
+
 
 // Same orientation as regular XY axis: origin in left bottom corner
 function matrixForLayout(x, y) {
@@ -27,7 +73,6 @@ function matrixForLayout(x, y) {
   mat4.identity(matrix);
   // Y coordinate
   mat4.translate(matrix, [0, 0, y * 1.05 * length  / videoAspectRatio]);
-
 
   // X coordinate
   mat4.rotate(matrix, (totalArc / numParticipantsX) / 2 - totalArc / 2, [0, 0, 1]);
@@ -38,49 +83,44 @@ function matrixForLayout(x, y) {
   mat4.scale(matrix, [(length / width) / videoAspectRatio, length / width, 1.0]); // Adapt width to fit arc
   mat4.translate(matrix, [width / 2, 0, 0]);
   return matrix;
-
 }
 
-function rebuildParticipants() {
-
-  // remove all pub and subs and leave the rest of geometry
-  var pubsubs = "PUBSUBS";
-
-  for (var i = geometryArray.length - 1; i >= 0; i--) {
-    if (geometryArray[i].type === pubsubs)
-      geometryArray.splice(i, 1);
+function getCameraExtrinsics() {
+  // We need to know how many guys there are
+    var numClients = 0;
+  // rearrange layout
+  for (var i = 0; i < geometryArray.length; i++) {
+    if (geometryArray[i].type === clientType) {
+      numClients++;
+    }
   }
 
-  for (var i = 0; i < numParticipants; i++) {
-    var myObject = {};
-    myObject.type = pubsubs;
-    myObject.matrix = matrixForLayout(i % numParticipantsX, Math.floor(i / numParticipantsX));
-    myObject.geometry = g.geometryPlane;
-    myObject.draw = function(gl) {
-      var currentProgram;
-      var geometry = this.geometry;
-      currentProgram = g.programTexture;
-      gl.useProgram(currentProgram);
-      gl.uniform1f(currentProgram.frameNumUniform, frame_num);
+  // It depends on the numParticipantsX and totalArc
+  var width = radius * Math.sqrt(2 - 2 * Math.cos(totalArc / numParticipantsX));
+  var height = width / videoAspectRatio;
 
-      mat4.multiply(mvMatrix, this.matrix);
-      setMatrixUniforms(gl, currentProgram);
-      gl.bindBuffer(gl.ARRAY_BUFFER, geometry.vertexObject);
-      gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, geometry.texCoordObject);
-      gl.vertexAttribPointer(currentProgram.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, g.texture);
-      gl.uniform1i(currentProgram.samplerUniform, 0);
-
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometry.indexObject);
-      gl.drawElements(gl.TRIANGLES, geometry.numIndices, gl.UNSIGNED_BYTE, 0);
-    };
-    geometryArray.push(myObject);
+  var obj = {};
+  if (numClients == 0) {
+    numClients = 1;
   }
-  // console.log("Length %d", geometryArray.length);
+  var z = (Math.floor((numClients - 1) / numParticipantsX) + 1) * height;
+  var xc;
+  var yc;
+  if (numClients < numParticipantsX) {
+    var angle =  numClients * Math.PI / (numParticipantsX*2) - Math.PI / 2;
+    xc = radius * Math.cos(angle);
+    yc = radius * Math.sin(angle);
+  } else {
+    xc = radius;
+    yc = 0;
+  }
+  obj.eye = vec3.create([-xc, -yc, z]);
+  obj.center = vec3.create([xc, yc , z/2]);
+  obj.up = vec3.create([0, 0, 1]);
+  return obj;
 }
+
+
 // webgl helpers
 var mvMatrix = mat4.create();
 var mvMatrixStack = [];
