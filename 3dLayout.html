@@ -173,7 +173,7 @@ function updateWorld() {
   // xRot = -Math.PI / 2;
   var r = 2;
 //  g.camera.setPosition(r * Math.sin(xRot), r * Math.cos(xRot), 0.5);
-  // g.camera.setPosition(-1, 0, 0.1);
+//   g.camera.setPosition(0.1, 0.1, 10);
   var center, lookAt, up;
   var ext = getCameraExtrinsics();
   g.camera.setLookAtV(ext.eye, ext.center, ext.up);
@@ -184,7 +184,7 @@ function drawScene() {
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  var fovy = 90;
+  var fovy = 45;
   var fovy_rad = fovy * Math.PI / 180;
   if (canvas.width > canvas.height) {
     mat4.perspective(fovy, canvas.width / canvas.height, 0.1, 100.0, pMatrix);
@@ -261,8 +261,8 @@ function init() {
   myObject.matrix = mat4.create();
   mat4.identity(myObject.matrix);
   mat4.rotate(myObject.matrix, Math.PI / 2, [0, 0, 1]);
-  mat4.scale(myObject.matrix, [10, 2, 1]);
-  myObject.geometry = makeFloor(gl);
+  //mat4.scale(myObject.matrix, [10, 2, 1]);
+  myObject.geometry = makeFloor1(gl);
   myObject.draw = function(gl) {
       var currentProgram = g.programColor;
       gl.useProgram(currentProgram);

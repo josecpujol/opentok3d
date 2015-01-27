@@ -4,7 +4,7 @@ var width = 2.0;  // The one in makePlane
 var videoAspectRatio = 4.0/3.0;
 var radius = 1.0;
 var totalArc = Math.PI ;
-var numParticipantsX = 4;  // We will be stacking up
+var numParticipantsX = 3;  // We will be stacking up
 var clientType = "CLIENT";
 
 
@@ -104,17 +104,22 @@ function getCameraExtrinsics() {
     numClients = 1;
   }
   var z = (Math.floor((numClients - 1) / numParticipantsX) + 1) * height;
-  var xc;
-  var yc;
+  var xc, yc;  // center
+  var xe, ye;  // eye
+  var factor = 2.0;
   if (numClients < numParticipantsX) {
     var angle =  numClients * Math.PI / (numParticipantsX*2) - Math.PI / 2;
     xc = radius * Math.cos(angle);
     yc = radius * Math.sin(angle);
+    xe = -xc * factor * numClients / numParticipantsX;
+    ye = -yc * factor * numClients / numParticipantsX;
   } else {
     xc = radius;
     yc = 0;
+    xe = -factor * xc;
+    ye = 0;
   }
-  obj.eye = vec3.create([-xc, -yc, z]);
+  obj.eye = vec3.create([xe, ye, z]);
   obj.center = vec3.create([xc, yc , z/2]);
   obj.up = vec3.create([0, 0, 1]);
   return obj;
@@ -178,6 +183,61 @@ function makePlane(ctx) {
   return retval;
 }
 
+function makeCircle(ctx, radius, segments, colorCenter, colorBorder) {
+
+  // vertex coords array: center(0) + segments
+  var vertices = new Float32Array((segments + 1) * 3);
+  vertices[0] = vertices[1] = vertices[2] = 0.0;
+  for (var i = 0; i < segments; i++) {
+    var angle = i * 2 * Math.PI / segments;
+    vertices[3 + i*3 + 0] = radius * Math.cos(angle);
+    vertices[3 + i*3 + 1] = radius * Math.sin(angle);
+    vertices[3 + i*3 + 2] = 0.0;
+  }
+
+  var colors = new Float32Array((segments + 1) * 3);
+  for (var i = 0; i < 3; i++) {
+    colors[i] = colorCenter[i];
+  }
+  for (var i = 0; i < segments; i++) {
+    colors[3 + i * 3 + 0] = colorBorder[0];
+    colors[3 + i * 3 + 1] = colorBorder[1];
+    colors[3 + i * 3 + 2] = colorBorder[2];
+  }
+
+
+  // index array: 0, 1, 2,   0, 2, 3 ... 0, segment, 1
+  var indices = new Uint8Array(segments * 3);
+  for (var i = 0; i < segments; i++) {
+    indices[i * 3 + 0] = 0;
+    indices[i * 3 + 1] = i + 1;
+    indices[i * 3 + 2] = i + 2;
+  }
+  indices[3 * segments - 1] = 1;
+
+
+  var retval = {};
+
+  retval.vertexObject = ctx.createBuffer();
+  ctx.bindBuffer(ctx.ARRAY_BUFFER, retval.vertexObject);
+  ctx.bufferData(ctx.ARRAY_BUFFER, vertices, ctx.STATIC_DRAW);
+  ctx.bindBuffer(ctx.ARRAY_BUFFER, null);
+
+  retval.colorObject = ctx.createBuffer();
+  ctx.bindBuffer(ctx.ARRAY_BUFFER, retval.colorObject);
+  ctx.bufferData(ctx.ARRAY_BUFFER, colors, ctx.STATIC_DRAW);
+  ctx.bindBuffer(ctx.ARRAY_BUFFER, null);
+
+  retval.indexObject = ctx.createBuffer();
+  ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, retval.indexObject);
+  ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, indices, ctx.STATIC_DRAW);
+  ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, null);
+
+  retval.numIndices = indices.length;
+
+  return retval;
+}
+
 function makeFloor(ctx) {
   var object = makePlane(ctx);
   var colors = new Float32Array(
@@ -189,6 +249,11 @@ function makeFloor(ctx) {
   ctx.bufferData(ctx.ARRAY_BUFFER, colors, ctx.STATIC_DRAW);
 
   ctx.bindBuffer(ctx.ARRAY_BUFFER, null);
+  return object;
+}
+
+function makeFloor1(ctx) {
+  var object = makeCircle(ctx, 5, 20,  [0.05, 0.30, 0.43], [ 0.35, 0.69, 0.83]);
   return object;
 }
 
