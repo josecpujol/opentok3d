@@ -190,8 +190,8 @@ function makeCircle(ctx, radius, segments, colorCenter, colorBorder) {
   vertices[0] = vertices[1] = vertices[2] = 0.0;
   for (var i = 0; i < segments; i++) {
     var angle = i * 2 * Math.PI / segments;
-    vertices[3 + i*3 + 0] = Math.cos(angle);
-    vertices[3 + i*3 + 1] = Math.sin(angle);
+    vertices[3 + i*3 + 0] = radius * Math.cos(angle);
+    vertices[3 + i*3 + 1] = radius * Math.sin(angle);
     vertices[3 + i*3 + 2] = 0.0;
   }
 
@@ -211,8 +211,9 @@ function makeCircle(ctx, radius, segments, colorCenter, colorBorder) {
   for (var i = 0; i < segments; i++) {
     indices[i * 3 + 0] = 0;
     indices[i * 3 + 1] = i + 1;
-    indices[i * 3 + 2] = (i + 2) % (segments + 1) + 1;
+    indices[i * 3 + 2] = i + 2;
   }
+  indices[3 * segments - 1] = 1;
 
 
   var retval = {};
@@ -220,7 +221,11 @@ function makeCircle(ctx, radius, segments, colorCenter, colorBorder) {
   retval.vertexObject = ctx.createBuffer();
   ctx.bindBuffer(ctx.ARRAY_BUFFER, retval.vertexObject);
   ctx.bufferData(ctx.ARRAY_BUFFER, vertices, ctx.STATIC_DRAW);
+  ctx.bindBuffer(ctx.ARRAY_BUFFER, null);
 
+  retval.colorObject = ctx.createBuffer();
+  ctx.bindBuffer(ctx.ARRAY_BUFFER, retval.colorObject);
+  ctx.bufferData(ctx.ARRAY_BUFFER, colors, ctx.STATIC_DRAW);
   ctx.bindBuffer(ctx.ARRAY_BUFFER, null);
 
   retval.indexObject = ctx.createBuffer();
@@ -244,6 +249,11 @@ function makeFloor(ctx) {
   ctx.bufferData(ctx.ARRAY_BUFFER, colors, ctx.STATIC_DRAW);
 
   ctx.bindBuffer(ctx.ARRAY_BUFFER, null);
+  return object;
+}
+
+function makeFloor1(ctx) {
+  var object = makeCircle(ctx, 5, 20,  [0.05, 0.30, 0.43], [ 0.35, 0.69, 0.83]);
   return object;
 }
 
