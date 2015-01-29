@@ -174,9 +174,8 @@ function updateWorld() {
   var r = 2;
 //  g.camera.setPosition(r * Math.sin(xRot), r * Math.cos(xRot), 0.5);
 //   g.camera.setPosition(0.1, 0.1, 10);
-  var center, lookAt, up;
-  var ext = getCameraExtrinsics();
-  g.camera.setLookAtV(ext.eye, ext.center, ext.up);
+
+
 }
 
 
@@ -296,16 +295,22 @@ function init() {
   f();
 }
 
-var f = function () {
-  updateWorld();
-  drawScene();
-  requestId = window.requestAnimFrame(f, canvas);
-};
+    var f = function () {
+        updateWorld();
+        drawScene();
+        requestId = window.requestAnimFrame(f, canvas);
+    };
+
+    function updateCamera() {
+        var ext = getCameraExtrinsics();
+        g.camera.setLookAtSmoothV(ext.eye, ext.center, ext.up, 500);
+    }
 
     var nextId = 0;
 
     $("#add_client").click(function () {
         addClient(nextId);
+        updateCamera();
 
 
         // Debug: add button to remove client
@@ -314,6 +319,7 @@ var f = function () {
         myButton.click(function() {
             console.log("Remmoving client " + myId);
             removeClient(myId);
+            updateCamera();
             $(this).remove();
 
         });
