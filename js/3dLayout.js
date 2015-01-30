@@ -85,6 +85,8 @@ function matrixForLayout(x, y) {
   return matrix;
 }
 
+
+// Gets the camera position based on the number of clients
 function getCameraExtrinsics() {
   // We need to know how many guys there are
     var numClients = 0;
@@ -116,12 +118,13 @@ function getCameraExtrinsics() {
   } else {
     xc = radius;
     yc = 0;
-    xe = -factor * xc;
+    xe = -factor * radius - Math.floor((numClients - 1)/numParticipantsX)/3;
     ye = 0;
   }
   obj.eye = vec3.create([xe, ye, z]);
   obj.center = vec3.create([xc, yc , z/2]);
   obj.up = vec3.create([0, 0, 1]);
+
   return obj;
 }
 
@@ -253,7 +256,7 @@ function makeFloor(ctx) {
 }
 
 function makeFloor1(ctx) {
-  var object = makeCircle(ctx, 5, 20,  [0.05, 0.30, 0.43], [ 0.35, 0.69, 0.83]);
+  var object = makeCircle(ctx, 10, 20,  [0.05, 0.30, 0.43], [ 0.35, 0.69, 0.83]);
   return object;
 }
 
