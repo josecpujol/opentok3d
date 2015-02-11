@@ -8,7 +8,7 @@ var numParticipantsX = 3;  // We will be stacking up
 var clientType = "CLIENT";
 
 
-function addClient(id) {
+function addClient(id, myVideoElement) {
 
 
   var myObject = {};
@@ -32,7 +32,10 @@ function addClient(id) {
     gl.vertexAttribPointer(currentProgram.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, g.texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, myVideoElement);
     gl.uniform1i(currentProgram.samplerUniform, 0);
+
+    // matrix for plane will be set in rearrangeLayout
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometry.indexObject);
     gl.drawElements(gl.TRIANGLES, geometry.numIndices, gl.UNSIGNED_BYTE, 0);
@@ -155,7 +158,7 @@ function makePlane(ctx) {
   var normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
 
   // texCoord array
-  var texCoords = new Float32Array([1, 1, 0, 1, 0, 0, 1, 0]);
+  var texCoords = new Float32Array([1,0, 1, 1, 0, 1, 0, 0]);
 
   // index array
   var indices = new Uint8Array([0, 1, 2, 0, 2, 3]);

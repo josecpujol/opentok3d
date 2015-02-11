@@ -5,6 +5,7 @@
   <script src="js/webgl-utils.js"></script>
   <script src="js/J3DI.js"></script>
   <script src="js/myLibrary.js"></script>
+  <script src="//static.opentok.com/webrtc/v2.2/js/opentok.min.js" ></script>
 
  <!-- Shaders for axis -->
   <script id="shader-fs-color" type="x-shader/x-fragment">
@@ -84,11 +85,11 @@
 </head>
 <body onload="init();">
 
-    <div id="controls">
+    <div id="controls"  style="display: none;" >
         <input type="button" id="add_client" value="Add client" />
-        <input type="button" id="pause_world" value="Pause" />
     </div>
-    <canvas id="webgl-canvas" style="border: none;" width="600" height="600"></canvas>
+    <div id="myid" style="display: none;"></div>
+    <canvas id="webgl-canvas" style="border: none;" width="600" height="300"></canvas>
 <script>
 
 var g = {};
@@ -104,11 +105,19 @@ function initShaders() {
 
 function initTextures() {
   g.texture = gl.createTexture();
-  var cubeImage = new Image();
+
+  gl.bindTexture(gl.TEXTURE_2D, g.texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+
+/*  var cubeImage = new Image();
   cubeImage.onload = function () {
     handleTextureLoaded(cubeImage, g.texture);
   }
-  cubeImage.src = "texture.png";
+  cubeImage.src = "texture.png";*/
 }
 
 function handleTextureLoaded(image, texture) {
@@ -118,6 +127,7 @@ function handleTextureLoaded(image, texture) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
   gl.bindTexture(gl.TEXTURE_2D, null);
+
 }
 
 function createProgram(vertexShaderId, fragmentShaderId) {
@@ -292,23 +302,23 @@ function init() {
   onWindowResize();
   window.addEventListener('resize', onWindowResize, false);
 
-  f();
+  tick();
 }
 
-    var f = function () {
+    var tick = function () {
         updateWorld();
         drawScene();
-        requestId = window.requestAnimFrame(f, canvas);
+        requestId = window.requestAnimFrame(tick, canvas);
     };
 
     function updateCamera() {
         var ext = getCameraExtrinsics();
-        g.camera.setLookAtSmoothV(ext.eye, ext.center, ext.up, 500);
+        g.camera.setLookAtSmoothV(ext.eye, ext.center, ext.up, 800);
     }
 
     var nextId = 0;
 
-    $("#add_client").click(function () {
+ /*   $("#add_client").click(function () {
         addClient(nextId);
         updateCamera();
 
@@ -324,16 +334,62 @@ function init() {
 
         });
         $('#controls').append(myButton);
-
-
-
         nextId++;
+    });*/
+
+
+
+    var apiKey    = "%APIKEY%";
+    var sessionId = "%SESSIONID%"
+    var token     = "%TOKEN%";
+    OT.setLogLevel(OT.ERROR);
+    var session = OT.initSession(apiKey, sessionId);
+
+
+    session.on("streamDestroyed", function(event) {
+        console.log("Stream " + event.stream.streamId + " ended. " + event.reason);
+          removeClient(event.stream.streamId);
+          updateCamera();
+
     });
 
-    $("#pause_world").click(function () {
-        run = !run;
+    session.on("streamCreated", function(event) {
+        // Add invisible div for it
+        var div = document.createElement("div");
+        div.style.display = "none";
+        var myid = "Client" + nextId;
+        div.id = myid;
+        document.body.appendChild(div);
+        var subscriber = session.subscribe(event.stream,  myid, function(err) {
+            if (err) {
+                console.error('Could not subscribe: ' + err);
+                return;
+            }
+
+
+            var videoElement = subscriber.videoElement();
+            addClient(event.stream.streamId, videoElement);
+            updateCamera();
+        });
+        //console.log("stream created");
     });
 
-</script>
+
+    session.connect(token, function (error) {
+        var publisher = OT.initPublisher("myid", {resolution: "320x240"});
+        session.publish(publisher, function(err) {
+            if (err) {
+                console.error('Could not publish: ' + err);
+                return;
+            }
+
+            var pubVideoElement = publisher.videoElement();
+            addClient(nextId++, pubVideoElement);
+            updateCamera();
+        });
+    });
+
+  </script>
+
 </body>
 </html>
