@@ -93,6 +93,7 @@
 <script>
 
 var g = {};
+var standalone_mode = true;
 
 function initShaders() {
   g.programTexture = createProgram("shader-vs", "shader-fs-texture");
@@ -113,11 +114,13 @@ function initTextures() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.bindTexture(gl.TEXTURE_2D, null);
 
-/*  var cubeImage = new Image();
-  cubeImage.onload = function () {
-    handleTextureLoaded(cubeImage, g.texture);
+  if (standalone_mode) {
+    var cubeImage = new Image();
+    cubeImage.onload = function () {
+      handleTextureLoaded(cubeImage, g.texture);
+    }
+    cubeImage.src = "texture.png";
   }
-  cubeImage.src = "texture.png";*/
 }
 
 function handleTextureLoaded(image, texture) {
@@ -240,70 +243,79 @@ function onWindowResize(event) {
 
 var gl;
 var canvas;
-function init() {
-  canvas = document.getElementById("webgl-canvas");
+    function init() {
 
-  gl = WebGLUtils.setupWebGL(canvas);
-  if (!gl) {
-    return;
-  }
-  initShaders();
-  initTextures();
+        // reveal debug controls
+        if (standalone_mode) {
+           $( "#controls" ).show();
 
-  // g.geometry = makeBox(gl);
-  g.geometryPlane = makePlane(gl);
-  g.axis = makeAxis(gl);
+        }
 
-  camera = new Camera();
-  camera.setLookAt(5, 5, 5,
-    0, 0, 0.3,
-    0, 0, 1);
-  camera.setLookAt(0, 0, 10,
-    0, 0, 0,
-    1, 0, 0);
-  g.camera = camera;
-  // g.geometry = makeSphere(gl, 1.0, 10, 10);
 
-  var myObject = {};
+        canvas = document.getElementById("webgl-canvas");
 
-  myObject.type = "FLOOR";
-  myObject.matrix = mat4.create();
-  mat4.identity(myObject.matrix);
-  mat4.rotate(myObject.matrix, Math.PI / 2, [0, 0, 1]);
-  //mat4.scale(myObject.matrix, [10, 2, 1]);
-  myObject.geometry = makeFloor1(gl);
-  myObject.draw = function(gl) {
-      var currentProgram = g.programColor;
-      gl.useProgram(currentProgram);
-      var geometry = this.geometry;
-      gl.disable(gl.BLEND);
+        gl = WebGLUtils.setupWebGL(canvas);
+        if (!gl) {
+            return;
+        }
+        initShaders();
+        initTextures();
 
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      gl.enable(gl.BLEND);
-      gl.bindBuffer(gl.ARRAY_BUFFER, geometry.colorObject);
-      gl.vertexAttribPointer(currentProgram.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
+        // g.geometry = makeBox(gl);
+        g.geometryPlane = makePlane(gl);
+        g.axis = makeAxis(gl);
 
-      gl.uniform1f(currentProgram.frameNumUniform, frame_num);
+        camera = new Camera();
+        camera.setLookAt(5, 5, 5,
+                         0, 0, 0.3,
+                         0, 0, 1);
+        camera.setLookAt(0, 0, 10,
+                         0, 0, 0,
+                         1, 0, 0);
+        g.camera = camera;
+        // g.geometry = makeSphere(gl, 1.0, 10, 10);
 
-      mat4.multiply(mvMatrix, this.matrix);
-      setMatrixUniforms(gl, currentProgram);
-      gl.bindBuffer(gl.ARRAY_BUFFER, geometry.vertexObject);
-      gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+        var myObject = {};
 
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometry.indexObject);
-      gl.drawElements(gl.TRIANGLES, geometry.numIndices, gl.UNSIGNED_BYTE, 0);
-  }
-  geometryArray.push(myObject);
+        myObject.type = "FLOOR";
+        myObject.matrix = mat4.create();
+        mat4.identity(myObject.matrix);
+        mat4.rotate(myObject.matrix, Math.PI / 2, [0, 0, 1]);
+        //mat4.scale(myObject.matrix, [10, 2, 1]);
+        myObject.geometry = makeFloor1(gl);
+        myObject.draw = function(gl) {
+            var currentProgram = g.programColor;
+            gl.useProgram(currentProgram);
+            var geometry = this.geometry;
+            gl.disable(gl.BLEND);
 
-  gl.clearColor(0.19, 0.62, 0.8, 1.0);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.enable(gl.BLEND);
+            gl.bindBuffer(gl.ARRAY_BUFFER, geometry.colorObject);
+            gl.vertexAttribPointer(currentProgram.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
 
-  gl.enable(gl.DEPTH_TEST);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  onWindowResize();
-  window.addEventListener('resize', onWindowResize, false);
+            gl.uniform1f(currentProgram.frameNumUniform, frame_num);
 
-  tick();
-}
+            mat4.multiply(mvMatrix, this.matrix);
+            setMatrixUniforms(gl, currentProgram);
+            gl.bindBuffer(gl.ARRAY_BUFFER, geometry.vertexObject);
+            gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometry.indexObject);
+            gl.drawElements(gl.TRIANGLES, geometry.numIndices, gl.UNSIGNED_BYTE, 0);
+        }
+        geometryArray.push(myObject);
+
+        gl.clearColor(0.19, 0.62, 0.8, 1.0);
+
+        gl.enable(gl.DEPTH_TEST);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        onWindowResize();
+        window.addEventListener('resize', onWindowResize, false);
+
+        tick();
+    }
+
 
     var tick = function () {
         updateWorld();
@@ -318,7 +330,7 @@ function init() {
 
     var nextId = 0;
 
- /*   $("#add_client").click(function () {
+    $("#add_client").click(function () {
         addClient(nextId);
         updateCamera();
 
@@ -335,59 +347,64 @@ function init() {
         });
         $('#controls').append(myButton);
         nextId++;
-    });*/
-
-
-
-    var apiKey    = "%APIKEY%";
-    var sessionId = "%SESSIONID%"
-    var token     = "%TOKEN%";
-    OT.setLogLevel(OT.ERROR);
-    var session = OT.initSession(apiKey, sessionId);
-
-
-    session.on("streamDestroyed", function(event) {
-        console.log("Stream " + event.stream.streamId + " ended. " + event.reason);
-          removeClient(event.stream.streamId);
-          updateCamera();
-
     });
 
-    session.on("streamCreated", function(event) {
-        // Add invisible div for it
-        var div = document.createElement("div");
-        div.style.display = "none";
-        var myid = "Client" + nextId;
-        div.id = myid;
-        document.body.appendChild(div);
-        var subscriber = session.subscribe(event.stream,  myid, function(err) {
-            if (err) {
-                console.error('Could not subscribe: ' + err);
-                return;
-            }
+
+    if (!standalone_mode) {
 
 
-            var videoElement = subscriber.videoElement();
-            addClient(event.stream.streamId, videoElement);
+        var apiKey    = VOID;
+        var sessionId = VOID;
+        var token     = VOID
+
+        OT.setLogLevel(OT.ERROR);
+        var session = OT.initSession(apiKey, sessionId);
+
+
+        session.on("streamDestroyed", function(event) {
+            console.log("Stream " + event.stream.streamId + " ended. " + event.reason);
+            removeClient(event.stream.streamId);
             updateCamera();
+
         });
-        //console.log("stream created");
-    });
+
+        session.on("streamCreated", function(event) {
+            // Add invisible div for it
+            var div = document.createElement("div");
+            div.style.display = "none";
+            var myid = "Client" + nextId;
+            div.id = myid;
+            document.body.appendChild(div);
+            var subscriber = session.subscribe(event.stream,  myid, function(err) {
+                if (err) {
+                    console.error('Could not subscribe: ' + err);
+                    return;
+                }
 
 
-    session.connect(token, function (error) {
-        var publisher = OT.initPublisher("myid", {resolution: "320x240"});
-        session.publish(publisher, function(err) {
-            if (err) {
-                console.error('Could not publish: ' + err);
-                return;
-            }
-
-            var pubVideoElement = publisher.videoElement();
-            addClient(nextId++, pubVideoElement);
-            updateCamera();
+                var videoElement = subscriber.videoElement();
+                addClient(event.stream.streamId, videoElement);
+                updateCamera();
+            });
+            //console.log("stream created");
         });
-    });
+
+
+
+        session.connect(token, function (error) {
+            var publisher = OT.initPublisher("myid", {resolution: "320x240"});
+            session.publish(publisher, function(err) {
+                if (err) {
+                    console.error('Could not publish: ' + err);
+                    return;
+                }
+
+                var pubVideoElement = publisher.videoElement();
+                addClient(nextId++, pubVideoElement);
+                updateCamera();
+            });
+        });
+    }
 
   </script>
 
