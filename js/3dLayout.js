@@ -1,4 +1,7 @@
-geometryArray = [];
+
+function initWebgl(canvas_name) {
+
+}
 
 var width = 2.0;  // The one in makePlane
 var videoAspectRatio = 4.0/3.0;
@@ -7,16 +10,66 @@ var totalArc = Math.PI ;
 var numParticipantsX = 3;  // We will be stacking up
 var clientType = "CLIENT";
 
+function createFloor() {
+  var myObject = {};
 
-function addClient(id, myVideoElement) {
+  myObject.type = "FLOOR";
+  myObject.reflect = false;
+  myObject.matrix = mat4.create();
+  mat4.identity(myObject.matrix);
+  mat4.rotate(myObject.matrix, Math.PI / 2, [0, 0, 1]);
+  //mat4.scale(myObject.matrix, [10, 2, 1]);
+  myObject.geometry = makeFloor1(gl);
+  myObject.draw = function(gl) {
+    var currentProgram = g.programColor;
+    gl.useProgram(currentProgram);
+    var geometry = this.geometry;
+    gl.disable(gl.BLEND);
 
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.BLEND);
+    gl.bindBuffer(gl.ARRAY_BUFFER, geometry.colorObject);
+    gl.vertexAttribPointer(currentProgram.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
 
+    gl.uniform1f(currentProgram.frameNumUniform, frame_num);
+
+    mat4.multiply(mvMatrix, this.matrix);
+    setMatrixUniforms(gl, currentProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, geometry.vertexObject);
+    gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometry.indexObject);
+    gl.drawElements(gl.TRIANGLES, geometry.numIndices, gl.UNSIGNED_BYTE, 0);
+  }
+  return myObject;
+}
+
+function createAxis() {
+  var myObject = {};
+  myObject.type = "AXIS";
+  myObject.reflect = false;
+  myObject.matrix = mat4.create();
+  mat4.identity(myObject.matrix);
+  myObject.geometry = makeAxis(gl);
+  myObject.draw = function (gl) {
+    gl.useProgram(g.programColor);
+    var geometry = this.geometry;
+    setMatrixUniforms(gl, g.programColor);
+    gl.bindBuffer(gl.ARRAY_BUFFER, geometry.vertexObject);
+    gl.vertexAttribPointer(g.programColor.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, geometry.colorObject);
+    gl.vertexAttribPointer(g.programColor.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.LINES, 0, 6);
+  }
+  return myObject;
+}
+
+function createClient(myVideoElement) {
   var myObject = {};
   myObject.type = clientType;
   myObject.reflect = true;
   // myObject.matrix = this will be filled in rearrangelayout
   myObject.geometry = g.geometryPlane;
-  myObject.id = id;
   myObject.draw = function(gl) {
     var currentProgram;
     var geometry = this.geometry;
@@ -43,33 +96,15 @@ function addClient(id, myVideoElement) {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometry.indexObject);
     gl.drawElements(gl.TRIANGLES, geometry.numIndices, gl.UNSIGNED_BYTE, 0);
   };
-  geometryArray.push(myObject);
-
-  rearrangeLayout();
+  return myObject;
 }
 
-function removeClient(id) {
 
-  // Remove guy with that id
-  for (var i = geometryArray.length - 1; i >= 0; i--) {
-    if (geometryArray[i].id == id)
-      geometryArray.splice(i, 1);
-  }
 
-  rearrangeLayout();
-}
 
-function rearrangeLayout() {
 
-  var posClient = 0;
-  // rearrange layout
-  for (var i = 0; i < geometryArray.length; i++) {
-    if (geometryArray[i].type === clientType) {
-      geometryArray[i].matrix = matrixForLayout(posClient % numParticipantsX, Math.floor(posClient / numParticipantsX));
-      posClient++;
-    }
-  }
-}
+
+
 
 
 // Same orientation as regular XY axis: origin in left bottom corner
@@ -93,15 +128,9 @@ function matrixForLayout(x, y) {
 
 
 // Gets the camera position based on the number of clients
-function getCameraExtrinsics() {
-  // We need to know how many guys there are
-    var numClients = 0;
-  // rearrange layout
-  for (var i = 0; i < geometryArray.length; i++) {
-    if (geometryArray[i].type === clientType) {
-      numClients++;
-    }
-  }
+function getCameraExtrinsics(scene) {
+
+  numClients = scene.getNumObjectsByType(clientType);
 
   // It depends on the numParticipantsX and totalArc
   var width = radius * Math.sqrt(2 - 2 * Math.cos(totalArc / numParticipantsX));

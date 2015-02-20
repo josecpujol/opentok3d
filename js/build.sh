@@ -1,4 +1,4 @@
-FILES=(glMatrix-0.9.5.min.js 3dLayout.js camera.js)
+FILES=(glMatrix-0.9.5.min.js 3dLayout.js camera.js scene.js)
 OUTPUTFILE="myLibrary.js"
 rm $OUTPUTFILE
 echo "Output file: "$OUTPUTFILE

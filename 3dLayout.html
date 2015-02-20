@@ -93,6 +93,7 @@
 <script>
 
 var g = {};
+
 var standalone_mode = true;
 
 function initShaders() {
@@ -192,7 +193,7 @@ function updateWorld() {
 }
 
 
-function drawScene() {
+function drawScene(myScene, myCamera) {
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -206,22 +207,23 @@ function drawScene() {
     mat4.perspective(new_fovy, canvas.width / canvas.height, 0.1, 100.0, pMatrix);
   }
   // mat4.frustum(-canvas.width/2, canvas.width/2, -canvas.heigth / 2, canvas.height / 2, 0.1, 100.0, pMatrix);
-  mvMatrix = g.camera.getExtrinsicMatrix();
+  mvMatrix = myCamera.getExtrinsicMatrix();
 
+    var myArray = myScene.geometryArray;
 
   // Draw reflected objects
-  for (var i = 0; i < geometryArray.length; i++) {
-    if (!geometryArray[i].reflect)
+ for (var i = 0; i < myArray.length; i++) {
+    if (!myArray[i].reflect)
       continue;
     mvPushMatrix();
     mat4.scale(mvMatrix, [1, 1, -1]);
-    geometryArray[i].draw(gl);
+    myArray[i].draw(gl);
     mvPopMatrix();
   }
 
-  for (var i = 0; i < geometryArray.length; i++) {
+  for (var i = 0; i < myArray.length; i++) {
     mvPushMatrix();
-    geometryArray[i].draw(gl);
+    myArray[i].draw(gl);
     mvPopMatrix();
   }
 }
@@ -238,8 +240,22 @@ function onMouseMove(event) {
     //console.log("OnMouseMove: " + event.clientX + " " + event.clientY);
 }
 
+function addClient(id, myVideoElement) {
+  var myObj = createClient(myVideoElement);
+  myObj.id = id;
+  scene.add(myObj);
+  rearrangeLayout();
+}
+
+function removeClient(id) {
+  scene.removeById(id);
+  rearrangeLayout();
+}
+
 var gl;
 var canvas;
+    var scene;
+    var camera;
     function start() {
         init();
         animate();
@@ -252,6 +268,16 @@ var canvas;
 
         }
 
+        scene = new Scene();
+        /*
+        initWebgl();
+        scene = createScene();
+        camera = createCamera();
+        camera setup...
+        scene.add(createAxis());
+        scene.add(createFloor());
+        */
+
         canvas = document.getElementById("webgl-canvas");
 
 
@@ -263,24 +289,7 @@ var canvas;
         initTextures();
 
 
-        var myObjectAxis = {};
-        myObjectAxis.type = "AXIS";
-        myObjectAxis.reflect = false;
-        myObjectAxis.matrix = mat4.create();
-        mat4.identity(myObjectAxis.matrix);
-        myObjectAxis.geometry = makeAxis(gl);
-        myObjectAxis.draw = function (gl) {
-            gl.useProgram(g.programColor);
-            var geometry = this.geometry;
-            setMatrixUniforms(gl, g.programColor);
-            gl.bindBuffer(gl.ARRAY_BUFFER, geometry.vertexObject);
-            gl.vertexAttribPointer(g.programColor.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-            gl.bindBuffer(gl.ARRAY_BUFFER, geometry.colorObject);
-            gl.vertexAttribPointer(g.programColor.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
-            gl.drawArrays(gl.LINES, 0, 6);
-        }
 
-        geometryArray.push(myObjectAxis);
 
         camera = new Camera();
         camera.setLookAt(2, 2, 2,
@@ -290,42 +299,16 @@ var canvas;
                          0, 0, 0,
                          1, 0, 0);
                          */
-        g.camera = camera;
+
         // g.geometry = makeSphere(gl, 1.0, 10, 10);
 
         g.geometryPlane = makePlane(gl);  // Needed for planes. Move there
 
-        var myObject = {};
+        var axisObj = createAxis();
+        scene.add(axisObj);
 
-        myObject.type = "FLOOR";
-        myObjectAxis.reflect = false;
-        myObject.matrix = mat4.create();
-        mat4.identity(myObject.matrix);
-        mat4.rotate(myObject.matrix, Math.PI / 2, [0, 0, 1]);
-        //mat4.scale(myObject.matrix, [10, 2, 1]);
-        myObject.geometry = makeFloor1(gl);
-        myObject.draw = function(gl) {
-            var currentProgram = g.programColor;
-            gl.useProgram(currentProgram);
-            var geometry = this.geometry;
-            gl.disable(gl.BLEND);
-
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-            gl.enable(gl.BLEND);
-            gl.bindBuffer(gl.ARRAY_BUFFER, geometry.colorObject);
-            gl.vertexAttribPointer(currentProgram.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
-
-            gl.uniform1f(currentProgram.frameNumUniform, frame_num);
-
-            mat4.multiply(mvMatrix, this.matrix);
-            setMatrixUniforms(gl, currentProgram);
-            gl.bindBuffer(gl.ARRAY_BUFFER, geometry.vertexObject);
-            gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometry.indexObject);
-            gl.drawElements(gl.TRIANGLES, geometry.numIndices, gl.UNSIGNED_BYTE, 0);
-        }
-        geometryArray.push(myObject);
+        var floorObj = createFloor();
+        scene.add(floorObj);
 
         gl.clearColor(0.19, 0.62, 0.8, 1.0);
 
@@ -340,13 +323,27 @@ var canvas;
 
     function animate () {
         updateWorld();
-        drawScene();
+        drawScene(scene,camera);
         window.requestAnimFrame(animate, canvas);
     };
 
     function updateCamera() {
-        var ext = getCameraExtrinsics();
-        g.camera.setLookAtSmoothV(ext.eye, ext.center, ext.up, 800);
+        var ext = getCameraExtrinsics(scene);
+        camera.setLookAtSmoothV(ext.eye, ext.center, ext.up, 800);
+    }
+
+    function rearrangeLayout() {
+
+        var myArray = scene.geometryArray;
+
+        var posClient = 0;
+        // rearrange layout
+        for (var i = 0; i < myArray.length; i++) {
+            if (myArray[i].type === clientType) {
+                myArray[i].matrix = matrixForLayout(posClient % numParticipantsX, Math.floor(posClient / numParticipantsX));
+                posClient++;
+            }
+        }
     }
 
     var nextId = 0;
