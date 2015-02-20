@@ -83,7 +83,7 @@
     }
 </script>
 </head>
-<body onload="init();">
+<body onload="start();">
 
     <div id="controls"  style="display: none;" >
         <input type="button" id="add_client" value="Add client" />
@@ -208,18 +208,10 @@ function drawScene() {
   // mat4.frustum(-canvas.width/2, canvas.width/2, -canvas.heigth / 2, canvas.height / 2, 0.1, 100.0, pMatrix);
   mvMatrix = g.camera.getExtrinsicMatrix();
 
-  // Draw axis
-  gl.useProgram(g.programColor);
-  setMatrixUniforms(gl, g.programColor);
-  gl.bindBuffer(gl.ARRAY_BUFFER, g.axis.vertexObject);
-  gl.vertexAttribPointer(g.programColor.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-  gl.bindBuffer(gl.ARRAY_BUFFER, g.axis.colorObject);
-  gl.vertexAttribPointer(g.programColor.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
-  gl.drawArrays(gl.LINES, 0, 6);
 
-  // Everything but the floor is to be reflected
+  // Draw reflected objects
   for (var i = 0; i < geometryArray.length; i++) {
-    if (geometryArray[i].type === "FLOOR")
+    if (!geometryArray[i].reflect)
       continue;
     mvPushMatrix();
     mat4.scale(mvMatrix, [1, 1, -1]);
@@ -241,8 +233,17 @@ function onWindowResize(event) {
   console.log("Onresize");
 }
 
+
+function onMouseMove(event) {
+    //console.log("OnMouseMove: " + event.clientX + " " + event.clientY);
+}
+
 var gl;
 var canvas;
+    function start() {
+        init();
+        animate();
+    }
     function init() {
 
         // reveal debug controls
@@ -251,8 +252,8 @@ var canvas;
 
         }
 
-
         canvas = document.getElementById("webgl-canvas");
+
 
         gl = WebGLUtils.setupWebGL(canvas);
         if (!gl) {
@@ -261,23 +262,43 @@ var canvas;
         initShaders();
         initTextures();
 
-        // g.geometry = makeBox(gl);
-        g.geometryPlane = makePlane(gl);
-        g.axis = makeAxis(gl);
+
+        var myObjectAxis = {};
+        myObjectAxis.type = "AXIS";
+        myObjectAxis.reflect = false;
+        myObjectAxis.matrix = mat4.create();
+        mat4.identity(myObjectAxis.matrix);
+        myObjectAxis.geometry = makeAxis(gl);
+        myObjectAxis.draw = function (gl) {
+            gl.useProgram(g.programColor);
+            var geometry = this.geometry;
+            setMatrixUniforms(gl, g.programColor);
+            gl.bindBuffer(gl.ARRAY_BUFFER, geometry.vertexObject);
+            gl.vertexAttribPointer(g.programColor.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, geometry.colorObject);
+            gl.vertexAttribPointer(g.programColor.vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
+            gl.drawArrays(gl.LINES, 0, 6);
+        }
+
+        geometryArray.push(myObjectAxis);
 
         camera = new Camera();
-        camera.setLookAt(5, 5, 5,
+        camera.setLookAt(2, 2, 2,
                          0, 0, 0.3,
                          0, 0, 1);
-        camera.setLookAt(0, 0, 10,
+     /*   camera.setLookAt(0, 0, 10,
                          0, 0, 0,
                          1, 0, 0);
+                         */
         g.camera = camera;
         // g.geometry = makeSphere(gl, 1.0, 10, 10);
+
+        g.geometryPlane = makePlane(gl);  // Needed for planes. Move there
 
         var myObject = {};
 
         myObject.type = "FLOOR";
+        myObjectAxis.reflect = false;
         myObject.matrix = mat4.create();
         mat4.identity(myObject.matrix);
         mat4.rotate(myObject.matrix, Math.PI / 2, [0, 0, 1]);
@@ -312,15 +333,15 @@ var canvas;
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         onWindowResize();
         window.addEventListener('resize', onWindowResize, false);
+        window.addEventListener( 'mousemove', onMouseMove, false );
 
-        tick();
     }
 
 
-    var tick = function () {
+    function animate () {
         updateWorld();
         drawScene();
-        requestId = window.requestAnimFrame(tick, canvas);
+        window.requestAnimFrame(animate, canvas);
     };
 
     function updateCamera() {
@@ -332,7 +353,7 @@ var canvas;
 
     $("#add_client").click(function () {
         addClient(nextId);
-        updateCamera();
+      //  updateCamera();
 
 
         // Debug: add button to remove client

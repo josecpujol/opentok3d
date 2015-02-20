@@ -13,6 +13,7 @@ function addClient(id, myVideoElement) {
 
   var myObject = {};
   myObject.type = clientType;
+  myObject.reflect = true;
   // myObject.matrix = this will be filled in rearrangelayout
   myObject.geometry = g.geometryPlane;
   myObject.id = id;
@@ -32,7 +33,7 @@ function addClient(id, myVideoElement) {
     gl.vertexAttribPointer(currentProgram.textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, g.texture);
-    if (addClient.arguments.length == 2) {
+    if (arguments.length == 2) {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, myVideoElement);
     }
     gl.uniform1i(currentProgram.samplerUniform, 0);
