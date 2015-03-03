@@ -18,13 +18,22 @@
 
 
 		<script src="js/three.min.js"></script>
-          <script src="js/jquery-2.1.1.min.js"></script>
+        <script src="js/jquery-2.1.1.min.js"></script>
+        <script src="js/tween.min.js"></script>
 
         <script>
 
 
-            var camera, scene, renderer;
-            var floor;
+            function lookAt (myObject, value) {
+                myObject.lookAt(value);
+                myObject.myLookAt = value.clone();
+            }
+
+
+
+            var camera, scene, renderer, sceneFloor;
+            var floor, sphere;
+            var tweenCameraPosition, tweenCameraCenter;
 
 
             init();
@@ -34,35 +43,36 @@
 
                 renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
                 renderer.autoClear = false;
+                renderer.sortObjects = false;
                 //renderer.setPixelRatio( window.devicePixelRatio );
                 renderer.setSize( window.innerWidth, window.innerHeight );
                 renderer.setClearColor( new THREE.Color(0.19, 0.62, 0.8));
                 document.body.appendChild( renderer.domElement );
 
-                //
-
-                camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 0.1, 20 );
-                camera.position.set(-2, 0, 1);
+                camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 200 );
+                camera.myLookAt = new THREE.Vector3();   // hack to store the look at for camera interpolation. We can get the direction from rotation, but not the length
+                                                         // Always call lookAt(obj, value), instead of obj.lookAt(value)
+                camera.position.set(-10, 0, 0.5);
                 camera.up.set(0, 0, 1);
-                camera.lookAt(new THREE.Vector3(0, 0, 0));
+                lookAt(camera, new THREE.Vector3(0,0,0));
+
+                tweenCameraPosition = new TWEEN.Tween({});
+                tweenCameraCenter = new TWEEN.Tween({});
 
                 // var controls = new THREE.TrackballControls( camera );
                 // controls.addEventListener( 'change', render );
 
                 scene = new THREE.Scene();
-
+                sceneFloor = new THREE.Scene();
 
                 // AxisHelper
                 var axisHelper = new THREE.AxisHelper(2);
-                scene.add(axisHelper);
-
+                //scene.add(axisHelper);
 
                 // Floor
-                var materialFloor = new THREE.MeshBasicMaterial( { color: 0xffffff, vertexColors: THREE.VertexColors, transparent: true, opacity: 0.85 } );
-
+                var materialFloor = new THREE.MeshBasicMaterial( { color: 0x80f0f0, vertexColors: THREE.VertexColors, transparent: true, opacity: 0.85 } );
                 var radius = 20;
                 var segments = 30;
-
                 var circleGeometry = new THREE.CircleGeometry( radius, segments );
                 for ( var i = 0; i < circleGeometry.faces.length; i++ )
                 {
@@ -76,31 +86,71 @@
                 }
 
                 floor = new THREE.Mesh( circleGeometry, materialFloor );
-
                 scene.add( floor );
+                sceneFloor.add(floor.clone());
 
+                // Background sphere
+                sphere = new THREE.Object3D();
+                var mixedGeometry = new THREE.SphereGeometry( radius, 40, 20);
+                var sphereWire = new THREE.Mesh(mixedGeometry.clone() , new THREE.MeshBasicMaterial( {color: 0xF0E68C, wireframe: true, wireframeLinewidth: 1} ) );
+                var sphereFlat = new THREE.Mesh(mixedGeometry.clone() , new THREE.MeshBasicMaterial( {color: 0x309ecc} ) );
+                sphereFlat.scale.set(0.995, 0.995, 0.995);
+
+                sphere.add(sphereWire);
+                sphere.add(sphereFlat);
+
+                sphere.position.set(radius*2, radius/2, radius/3);
+                sphere.rotation.x = 1;
+                scene.add( sphere );
 
                 //
-
                 window.addEventListener( 'resize', onWindowResize, false );
-
+                onWindowResize();
             }
 
             function onWindowResize() {
 
                 camera.aspect = window.innerWidth / window.innerHeight;
+                // Limit: aspect 1.35
+                var fov = 45;
+                var limit = 1.35;
+                if (camera.aspect < limit) {
+                    fov = fov / Math.pow(camera.aspect / limit, 0.8);
+                }
+                camera.fov = fov;
+
                 camera.updateProjectionMatrix();
 
                 renderer.setSize( window.innerWidth, window.innerHeight );
-
             }
 
             function animate() {
 
-                requestAnimationFrame( animate );
+                sphere.rotation.y += 0.001;
 
-                scene.remove(floor);
+                TWEEN.update();
+
+                requestAnimationFrame( animate );
+                renderer.autoClear = false;
+                renderer.clear();
+
+                // Mirror effect: https://www.opengl.org/archives/resources/code/samples/mjktips/Reflect.html
+                var gl = renderer.getContext();
+                gl.colorMask(false, false, false, false);
+                gl.enable( gl.STENCIL_TEST );
+                gl.stencilMask(0xff);
+                gl.stencilOp(gl.REPLACE, gl.REPLACE, gl.REPLACE);
+                gl.stencilFunc(gl.ALWAYS, 1, 0xff);
+
+                renderer.render(sceneFloor, camera);
+
+                gl.colorMask(true, true, true, true);
+                gl.stencilFunc(gl.EQUAL, 1, 0xff);
+                gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+                renderer.clear(false, true, false);  // for some reason, we can't disable the depth test. Let it run, and clear
+
                 // Invert z for all objects
+                scene.remove(floor);
                 for (var i = 0; i < scene.children.length; i++) {
                     var myobj = scene.children[i];
                     myobj.updateMatrix();
@@ -109,25 +159,28 @@
                     scalem.scale(new THREE.Vector3(1,1,-1));
                     myobj.matrix = scalem.multiply(mym);
                     myobj.matrixAutoUpdate = false;
-
                 }
 
-
-                renderer.clear();
                 renderer.render( scene, camera );
                 for (var i = 0; i < scene.children.length; i++) {
                     var myobj = scene.children[i];
                     myobj.matrixAutoUpdate = true;
                 }
-                scene.add(floor);
 
-                renderer.autoclear = false;
+                gl.disable(gl.STENCIL_TEST);
+                scene.remove(sphere);
+                scene.add(floor);  // we want floor in the same scene for z ordering
+
+
                 renderer.render( scene, camera );
 
-
+                // little hack to make sphere be rendered AFTER the floor
+                var tmp = new THREE.Scene();
+                tmp.add(sphere.clone());
+                renderer.render(tmp, camera);
+                scene.add(sphere);
             }
 
-            var width = 2.0;  // The one in makePlane
             var videoAspectRatio = 4.0/3.0;
             var radius = 1.0;
             var totalArc = Math.PI ;
@@ -137,9 +190,7 @@
             // Same orientation as regular XY axis: origin in left bottom corner
             function matrixForLayout(x, y) {
                 var matrix = new THREE.Matrix4();
-
                 var length = radius * Math.sqrt(2 - 2 * Math.cos(totalArc / numParticipantsX));
-
 
                 // Y coordinate
                 matrix.multiply(new THREE.Matrix4().makeTranslation(0, 0, y * 1.05 * length  / videoAspectRatio));
@@ -149,8 +200,7 @@
                 matrix.multiply(new THREE.Matrix4().makeRotationZ(x * totalArc / numParticipantsX));
                 matrix.multiply(new THREE.Matrix4().makeTranslation(radius, 0.0, 0.0)); // Same for all
                 matrix.multiply(new THREE.Matrix4().makeRotationY(-Math.PI / 2)); // Original geometry is xy plane. Make it yz plane
-                matrix.multiply(new THREE.Matrix4().makeScale((length / width) / videoAspectRatio, length / width, 1.0)); // Adapt width to fit arc
-                matrix.multiply(new THREE.Matrix4().makeScale(2,2,1));
+                matrix.multiply(new THREE.Matrix4().makeScale(length / videoAspectRatio, length, 1.0)); // Adapt width to fit arc
                 matrix.multiply(new THREE.Matrix4().makeTranslation( 0.5, 0, 0));  // original bounding box is (-0.5,-0.5)->(0.5,0.5).
 
                 return matrix;
@@ -161,7 +211,7 @@
                 // rearrange layout
                 for (var i = 0; i < scene.children.length; i++) {
                     var myobj = scene.children[i];
-                    if (myobj.myType === "client") {
+                    if (myobj.mytype === "client") {
 
                         // reset previous position and rotation
                         myobj.position.set(0,0,0);
@@ -174,6 +224,60 @@
                 }
             }
 
+            // Updates the camera automatically depending on the number of people in the room
+            function updateCamera() {
+                // We need to know how many guys there are
+                var numClients = 0;
+                // rearrange layout
+                for (var i = 0; i < scene.children.length; i++) {
+                    var myobj = scene.children[i];
+                    if (myobj.mytype === "client") numClients++;
+                }
+                console.log("Num clients: " + numClients);
+
+                // It depends on the numParticipantsX and totalArc
+                var width = radius * Math.sqrt(2 - 2 * Math.cos(totalArc / numParticipantsX));
+                var height = width / videoAspectRatio;
+
+                var obj = {};
+                if (numClients == 0) {
+                    numClients = 1;
+                }
+                var z = (Math.floor((numClients - 1) / numParticipantsX) + 1) * height;
+                var xc, yc;  // center
+                var xe, ye;  // eye
+                var factor = 2.0;
+                if (numClients < numParticipantsX) {
+                    var angle =  numClients * Math.PI / (numParticipantsX*2) - Math.PI / 2;
+                    xc = radius * Math.cos(angle);
+                    yc = radius * Math.sin(angle);
+                    xe = -xc * factor * numClients / numParticipantsX;
+                    ye = -yc * factor * numClients / numParticipantsX;
+                } else {
+                    xc = radius;
+                    yc = 0;
+                    xe = -factor * radius - Math.floor((numClients - 1)/numParticipantsX)/3;
+                    ye = 0;
+                }
+
+                tweenCameraPosition.stop();
+                tweenCameraPosition = new TWEEN.Tween({x: camera.position.x, y: camera.position.y, z: camera.position.z})
+                .to({x: xe, y: ye, z: z}, 1000)
+                .onUpdate( function() {
+                    camera.position.set(this.x, this.y, this.z);
+                })
+                .start();
+
+                tweenCameraCenter.stop();
+                tweenCameraCenter = new TWEEN.Tween({x: camera.myLookAt.x, y: camera.myLookAt.y, z: camera.myLookAt.z })
+                .to({x: xc, y: yc, z: z/2}, 1000)
+                .onUpdate( function() {
+                    lookAt(camera, new THREE.Vector3(this.x, this.y, this.z));
+                })
+                .start();
+
+            }
+
             function addClient(id) {
                 var mesh;
                 var geometry = new THREE.PlaneGeometry( 1, 1, 1 );
@@ -181,8 +285,8 @@
                 texture.anisotropy = renderer.getMaxAnisotropy();
                 var material = new THREE.MeshBasicMaterial( { map: texture, side: THREE.DoubleSide } );
                 mesh = new THREE.Mesh( geometry, material );
-                mesh.myType = "client";
                 mesh.name = id;
+                mesh.mytype = "client";  // Used to rearrange clients and count for camera update
                 scene.add( mesh );
                 rearrangeClients();
             }
@@ -196,6 +300,7 @@
             var nextId = 0;
             $("#add_client").click(function () {
                 addClient(nextId);
+                updateCamera();
 
                 // Debug: add button to remove client
                 var myId = nextId;
@@ -203,6 +308,7 @@
                 myButton.click(function() {
                     console.log("Remmoving client " + myId);
                     removeClient(myId);
+                    updateCamera();
                     $(this).remove();
 
                 });
