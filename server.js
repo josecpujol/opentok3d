@@ -32,6 +32,7 @@ var init = function (init_done) {
   console.log("apiSecret: " + apiSecret);
   opentok = new OpenTok(apiKey, apiSecret);
 
+  app.set('port', (process.env.PORT || 5000));
   app.use(express.static(__dirname + '/public'));
 
   app.get('/:room', function (req, res) {
@@ -62,12 +63,8 @@ var init = function (init_done) {
 
 
 function run() {
-  var server = app.listen(3000, function() {
-
-  var host = server.address().address
-  var port = server.address().port
-
-  console.log('Example app listening at http://%s:%s', host, port)
+  app.listen(app.get('port'), function() {
+    console.log('Example app listening at localost: ' + app.get('port'));
   });
 }
 
