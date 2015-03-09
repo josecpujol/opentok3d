@@ -7,9 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/josecpujol/opentok3d.git"
+  "engines": {
+    "node": "0.10.x"
   },
   "keywords": [
     "opentok",
@@ -27,4 +26,8 @@
     "url": "https://github.com/josecpujol/opentok3d/issues"
   },
   "homepage": "https://github.com/josecpujol/opentok3d"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/heroku/opentok3d"
+  }
 }
