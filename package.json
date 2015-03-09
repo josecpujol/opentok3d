@@ -25,7 +25,7 @@
   "bugs": {
     "url": "https://github.com/josecpujol/opentok3d/issues"
   },
-  "homepage": "https://github.com/josecpujol/opentok3d"
+  "homepage": "https://github.com/josecpujol/opentok3d",
   "repository": {
     "type": "git",
     "url": "https://github.com/heroku/opentok3d"
