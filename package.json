@@ -19,7 +19,7 @@
     "express": "^4.0.0",
     "opentok": "^2.2",
     "ejs": "^1.0.0"
-  }
+  },
   "author": "Jose Carlos Pujol",
   "license": "ISC",
   "bugs": {
