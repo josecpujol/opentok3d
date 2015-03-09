@@ -1,0 +1,30 @@
+{
+  "name": "opentok3d",
+  "version": "0.0.0",
+  "description": "Example of opentok based room server with webgl display ",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/josecpujol/opentok3d.git"
+  },
+  "keywords": [
+    "opentok",
+    "webgl",
+    "threejs"
+  ],
+  "dependencies": {
+    "express": "^4.0.0",
+    "opentok": "^2.2",
+    "ejs": "^1.0.0"
+  }
+  "author": "Jose Carlos Pujol",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/josecpujol/opentok3d/issues"
+  },
+  "homepage": "https://github.com/josecpujol/opentok3d"
+}

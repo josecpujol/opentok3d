@@ -5,41 +5,47 @@
 		<style>
 			body {
 				margin: 0px;
-				background-color: #000000;
+				background-color: #309ecc;
 				overflow: hidden;
 			}
             canvas { width: 100%; height: 100% }
 		</style>
 	</head>
 	<body>
-        <div id="controls"  >
+        <div id="controls" style="display: none;"  >
         <input type="button" id="add_client" value="Add client" />
         </div>
 
 
-		<script src="js/three.min.js"></script>
+		<script src="//threejs.org/build/three.min.js"></script>
         <script src="js/jquery-2.1.1.min.js"></script>
         <script src="js/tween.min.js"></script>
+        <script src="js/Detector.js"></script>
+        <script src="//static.opentok.com/v2/js/opentok.min.js"></script>
 
         <script>
-
-
-            function lookAt (myObject, value) {
-                myObject.lookAt(value);
-                myObject.myLookAt = value.clone();
-            }
-
-
-
+            // 3d stuff
             var camera, scene, renderer, sceneFloor;
             var floor, sphere;
             var tweenCameraPosition, tweenCameraCenter;
 
+            // opentok stuff
+            var apiKey = '<%= apiKey %>';
+            var sessionId = '<%= sessionId %>';
+            var token = '<%= token %>';
+            var session;
+            var clientId = 0;  // create unique ids for clients
 
-            init();
-            animate();
+            $( document ).ready(function() {
+                if (!Detector.webgl ) {
+                    window.location = "http://get.webgl.org";
+                } else {
+                    init();
+                    animate();
+                }
+            })
 
-            function init() {
+            function init3d() {
 
                 renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
                 renderer.autoClear = false;
@@ -50,14 +56,12 @@
                 document.body.appendChild( renderer.domElement );
 
                 camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 200 );
-                camera.myLookAt = new THREE.Vector3();   // hack to store the look at for camera interpolation. We can get the direction from rotation, but not the length
-                                                         // Always call lookAt(obj, value), instead of obj.lookAt(value)
                 camera.position.set(-10, 0, 0.5);
                 camera.up.set(0, 0, 1);
-                lookAt(camera, new THREE.Vector3(0,0,0));
+                camera.lookAt( new THREE.Vector3(0,0,0));
 
                 tweenCameraPosition = new TWEEN.Tween({});
-                tweenCameraCenter = new TWEEN.Tween({});
+                tweenCameraRotation = new TWEEN.Tween({});
 
                 // var controls = new THREE.TrackballControls( camera );
                 // controls.addEventListener( 'change', render );
@@ -108,6 +112,71 @@
                 onWindowResize();
             }
 
+            function initOpentok() {
+                OT.setLogLevel(OT.ERROR);
+                session = OT.initSession(apiKey, sessionId);
+
+
+                session.on("streamDestroyed", function(event) {
+                    console.log("Stream " + event.stream.streamId + " ended. " + event.reason);
+                    removeClient(event.stream.streamId);
+                    updateCamera();
+
+                });
+
+                session.on("streamCreated", function(event) {
+                    // Add invisible div for it
+                    var div = document.createElement("div");
+                    div.style.display = "none";
+                    var myid = createNewId();
+                    div.id = myid;
+                    document.body.appendChild(div);
+                    var subscriber = session.subscribe(event.stream,  myid, function(err) {
+                        if (err) {
+                            console.error('Could not subscribe: ' + err);
+                            return;
+                        }
+
+                        var videoElement = subscriber.videoElement();
+                        addClient(event.stream.streamId, videoElement);
+                        updateCamera();
+                    });
+                });
+
+
+
+                session.connect(token, function (error) {
+                    // Add invisible div for it
+                    var myId = createNewId();
+                    var div = document.createElement("div");
+                    div.style.display = "none";
+                    div.id = myId;
+                    document.body.appendChild(div);
+
+                    var publisher = OT.initPublisher(myId, {resolution: "320x240"});
+                    session.publish(publisher, function(err) {
+                        if (err) {
+                            console.error('Could not publish: ' + err);
+                            return;
+                        }
+                        var pubVideoElement = publisher.videoElement();
+                        addClient(myId, pubVideoElement);
+                        updateCamera();
+                    });
+                });
+            }
+
+            function createNewId() {
+                return "Client" + clientId++;
+
+            }
+
+
+           function init() {
+                init3d();
+                initOpentok();
+            }
+
             function onWindowResize() {
 
                 camera.aspect = window.innerWidth / window.innerHeight;
@@ -118,15 +187,13 @@
                     fov = fov / Math.pow(camera.aspect / limit, 0.8);
                 }
                 camera.fov = fov;
-
                 camera.updateProjectionMatrix();
-
                 renderer.setSize( window.innerWidth, window.innerHeight );
             }
 
             function animate() {
 
-                sphere.rotation.y += 0.001;
+                sphere.rotation.y += 0.0005;
 
                 TWEEN.update();
 
@@ -202,6 +269,7 @@
                 matrix.multiply(new THREE.Matrix4().makeRotationY(-Math.PI / 2)); // Original geometry is xy plane. Make it yz plane
                 matrix.multiply(new THREE.Matrix4().makeScale(length / videoAspectRatio, length, 1.0)); // Adapt width to fit arc
                 matrix.multiply(new THREE.Matrix4().makeTranslation( 0.5, 0, 0));  // original bounding box is (-0.5,-0.5)->(0.5,0.5).
+                matrix.multiply(new THREE.Matrix4().makeRotationZ(-Math.PI/2));  // rotate to fix the texture
 
                 return matrix;
             }
@@ -225,6 +293,7 @@
             }
 
             // Updates the camera automatically depending on the number of people in the room
+            var firstTime = true;
             function updateCamera() {
                 // We need to know how many guys there are
                 var numClients = 0;
@@ -244,7 +313,7 @@
                     numClients = 1;
                 }
                 var z = (Math.floor((numClients - 1) / numParticipantsX) + 1) * height;
-                var xc, yc;  // center
+                var xc, yc, zc;  // center
                 var xe, ye;  // eye
                 var factor = 2.0;
                 if (numClients < numParticipantsX) {
@@ -259,30 +328,47 @@
                     xe = -factor * radius - Math.floor((numClients - 1)/numParticipantsX)/3;
                     ye = 0;
                 }
+                var time = firstTime? 3000 : 1000;
+                firstTime = false;
 
                 tweenCameraPosition.stop();
                 tweenCameraPosition = new TWEEN.Tween({x: camera.position.x, y: camera.position.y, z: camera.position.z})
-                .to({x: xe, y: ye, z: z}, 1000)
+                .to({x: xe, y: ye, z: z}, time)
                 .onUpdate( function() {
                     camera.position.set(this.x, this.y, this.z);
                 })
                 .start();
 
-                tweenCameraCenter.stop();
-                tweenCameraCenter = new TWEEN.Tween({x: camera.myLookAt.x, y: camera.myLookAt.y, z: camera.myLookAt.z })
-                .to({x: xc, y: yc, z: z/2}, 1000)
+                var qm = new THREE.Quaternion();
+                var qinit = camera.quaternion.clone();
+                var matend = new THREE.Matrix4().lookAt( new THREE.Vector3(xe,ye,z), new THREE.Vector3(xc,yc, z/2), camera.up );
+                var qend = new THREE.Quaternion().setFromRotationMatrix(matend);
+                tweenCameraRotation.stop();
+                tweenCameraRotation = new TWEEN.Tween({t: 0}).to({t: 1}, time)
                 .onUpdate( function() {
-                    lookAt(camera, new THREE.Vector3(this.x, this.y, this.z));
+                    THREE.Quaternion.slerp(qinit, qend, qm, this.t);
+                    qm.normalize();
+                    camera.rotation.setFromQuaternion(qm);
                 })
                 .start();
 
             }
 
-            function addClient(id) {
+            function addClient(id, videoElement) {
+                console.log("Adding client " + id);
                 var mesh;
                 var geometry = new THREE.PlaneGeometry( 1, 1, 1 );
-                var texture = THREE.ImageUtils.loadTexture( 'texture.png' );
-                texture.anisotropy = renderer.getMaxAnisotropy();
+
+                var texture;
+                if (videoElement === undefined) {
+                    texture = THREE.ImageUtils.loadTexture( 'texture.png' );
+                } else {
+                    texture = new THREE.VideoTexture( videoElement );
+                    texture.minFilter = THREE.LinearFilter;
+                    texture.magFilter = THREE.LinearFilter;
+                    texture.format = THREE.RGBFormat;
+                }
+            //    texture.anisotropy = renderer.getMaxAnisotropy();
                 var material = new THREE.MeshBasicMaterial( { map: texture, side: THREE.DoubleSide } );
                 mesh = new THREE.Mesh( geometry, material );
                 mesh.name = id;
@@ -297,13 +383,13 @@
                 rearrangeClients();
             }
 
-            var nextId = 0;
+
             $("#add_client").click(function () {
-                addClient(nextId);
+                var myId = createNewId();
+                addClient(myId);
                 updateCamera();
 
                 // Debug: add button to remove client
-                var myId = nextId;
                 var myButton =$('<input type="button" value="Remove ' + myId + '"/>');
                 myButton.click(function() {
                     console.log("Remmoving client " + myId);
@@ -313,7 +399,6 @@
 
                 });
                 $('#controls').append(myButton);
-                nextId++;
             });
 
         </script>

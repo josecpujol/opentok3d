@@ -1,86 +1,74 @@
 
-var webpage; // To be preloaded in the initialization
-var threejs;  // same
+var OpenTok = require('opentok');
+var express = require('express');
+var app = express();
+
+
 var apiKey;
-function getChatPage(sessionId, token) {
-  // Do some substitutions here
-  // %APIKEY%
-  // %SESSIONID%
-  // %TOKEN%
-  var new_webpage = webpage.toString();
-  return new_webpage.replace(/%APIKEY%/g, apiKey)
-   .replace(/%SESSIONID%/g, sessionId)
-   .replace(/%TOKEN%/g, token);
-}
 
-function sendResponse(response, sessionId) {
-  response.writeHead(200, {"Content-Type" : "text/html"});
-  // Generate a token.
-  var tokenOptions = {};
-  tokenOptions.role = "publisher";
 
-  var token = opentok.generateToken(sessionId, tokenOptions);
+function sendResponse(res, sessionId) {
+  var token = opentok.generateToken(sessionId);
   console.log("Token: " + token);
-  var page = getChatPage(sessionId, token);
-  response.end(page);
+  res.render('3dLayoutThreeJs.ejs', {
+    apiKey: apiKey,
+    sessionId: sessionId,
+    token: token
+  });
 }
 
-var urlSessionMap = {}
+var roomSessionMap = {}
 var opentok;
 var init = function (init_done) {
-  var OpenTok = require('opentok');
   apiKey = process.env.API_KEY;
   var apiSecret = process.env.API_SECRET;
+
+  if (!apiKey || !apiSecret) {
+    console.log('You must specify API_KEY and API_SECRET environment variables');
+    process.exit(1);
+  }
+
   console.log("apiKey: " + apiKey);
   console.log("apiSecret: " + apiSecret);
   opentok = new OpenTok(apiKey, apiSecret);
-  
-  // Preload html page to serve it from memory
-  var fs = require('fs');
-  webpage = fs.readFileSync('./chat.html');
-  threejs = fs.readFileSync('./js/three.min.js');
+
+  app.use(express.static(__dirname + '/public'));
+
+  app.get('/:room', function (req, res) {
+    var room = req.params.room;
+    if (roomSessionMap[room] == null) {
+      console.log("First request to room " + room);
+      opentok.createSession(function (error, session) {
+        if (error) {
+          console.log("Error creating session:", error)
+          res.send(500);
+        } else {
+          console.log("Session ID for " + room + ": " + session.sessionId);
+          roomSessionMap[room] = session.sessionId;
+          sendResponse(res, session.sessionId);
+       //   res.send("new session Id: " + session.sessionId);
+        }
+      });
+    } else {
+      var sessionId = roomSessionMap[room];
+      console.log("Session id for room " + room + " was already created: " + sessionId);
+      //res.send("already existing session Id: " + sessionId);
+      sendResponse(res, sessionId);
+    }
+  })
+
   init_done();
- 
 }
 
-var init_done = function () {
-  run();
+
+function run() {
+  var server = app.listen(3000, function() {
+
+  var host = server.address().address
+  var port = server.address().port
+
+  console.log('Example app listening at http://%s:%s', host, port)
+  });
 }
 
-function run() {  
-  var http = require('http');
-  var server = http.createServer(function (request, response) {
-      var url = request.url;
-      if (url == "/" || url == "/favicon.ico") {
-        response.writeHead(200);
-        response.end();
-        return;
-      }
-      if (url == "/js/three.min.js") {
-        response.writeHead(200, {"Content-Type" : "application/javascript"});
-        response.end(threejs);
-        return;
-      }
-
-      if (urlSessionMap[url] == null) {
-        console.log("First request to room " + url);
-        console.log("Creating session id");
-        opentok.createSession(function (error, session) {
-          if (error) {
-            console.log("Error creating session:", error)
-          } else {
-            console.log("Session ID for " + url + ": " + session.sessionId);
-            urlSessionMap[url] = session.sessionId;
-            sendResponse(response, session.sessionId);
-          }
-        });
-      } else {
-        console.log("Session id for room " + url + " was already created: " + urlSessionMap[url]);
-        sendResponse(response, urlSessionMap[url]);
-      }
-    });
-  server.listen(8000);
-  console.log("Server running at http://127.0.0.1:8000/");
-}
-
-init(init_done);
+init(run);
