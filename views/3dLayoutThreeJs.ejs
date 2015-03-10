@@ -12,7 +12,7 @@
 		</style>
 	</head>
 	<body>
-        <div id="controls" style="display: none;"  >
+        <div id="controls" style="display: none;" >
         <input type="button" id="add_client" value="Add client" />
         </div>
 
@@ -337,6 +337,7 @@
                 .onUpdate( function() {
                     camera.position.set(this.x, this.y, this.z);
                 })
+                .easing(TWEEN.Easing.Cubic.InOut)
                 .start();
 
                 var qm = new THREE.Quaternion();
@@ -350,6 +351,7 @@
                     qm.normalize();
                     camera.rotation.setFromQuaternion(qm);
                 })
+                .easing(TWEEN.Easing.Cubic.InOut)
                 .start();
 
             }
