@@ -39,7 +39,7 @@ var init = function (init_done) {
     var room = req.params.room;
     if (roomSessionMap[room] == null) {
       console.log("First request to room " + room);
-      opentok.createSession(function (error, session) {
+      opentok.createSession({mediaMode:"routed"}, function (error, session) {
         if (error) {
           console.log("Error creating session:", error)
           res.send(500);
