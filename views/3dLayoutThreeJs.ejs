@@ -123,47 +123,32 @@
 
                 });
 
-                function getVideoElement(client) {
-                    var clientElement = document.getElementById(client.id);
-                    return clientElement.querySelector('video');
-                }
+
 
                 session.on("streamCreated", function(event) {
-                    // Add invisible div for it
-                    var div = document.createElement("div");
-                    div.style.display = "none";
-                    var myid = createNewId();
-                    div.id = myid;
-                    document.body.appendChild(div);
-                    var subscriber = session.subscribe(event.stream,  myid, function(err) {
+                    var div = document.createElement('div');
+                    var subscriber = session.subscribe(event.stream,  div, {insertMode: 'append'}, function(err) {
                         if (err) {
                             console.error('Could not subscribe: ' + err);
                             return;
                         }
 
-                        addClient(event.stream.streamId, getVideoElement(subscriber));
+                        addClient(event.stream.streamId, div.querySelector('video'));
                         updateCamera();
                     });
                 });
 
 
+                var divPub = document.createElement('div');
+                var publisher = OT.initPublisher(divPub, {resolution: '320x240', insertMode: 'append'});
 
-                session.connect(token, function (error) {
-                    // Add invisible div for it
-                    var myId = createNewId();
-                    var div = document.createElement("div");
-                    div.style.display = "none";
-                    div.id = myId;
-                    document.body.appendChild(div);
-
-                    var publisher = OT.initPublisher(myId, {resolution: "320x240"});
-
+                session.connect(token, function (err) {
                     session.publish(publisher, function(err) {
                         if (err) {
                             console.error('Could not publish: ' + err);
                             return;
                         }
-                        addClient(myId, getVideoElement(publisher));
+                        addClient(createNewId(), divPub.querySelector('video'));
                         updateCamera();
                     });
                 });
