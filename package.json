@@ -8,7 +8,7 @@
     "start": "node server.js"
   },
   "engines": {
-    "node": "0.10.x"
+    "node": "8.9.1"
   },
   "keywords": [
     "opentok",
